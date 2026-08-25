@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CollectionEntry, CollectionFolder, ComposedRequest } from "@/lib/types";
 import {
   addCollectionEntry,
@@ -21,10 +21,13 @@ interface Props {
 }
 
 export function CollectionsPanel({ request, onLoad }: Props) {
-  const [collections, setCollections] = useState<CollectionEntry[]>(() =>
-    loadCollections()
-  );
-  const [folders, setFolders] = useState<CollectionFolder[]>(() => loadFolders());
+  const [collections, setCollections] = useState<CollectionEntry[]>([]);
+  const [folders, setFolders] = useState<CollectionFolder[]>([]);
+
+  useEffect(() => {
+    setCollections(loadCollections());
+    setFolders(loadFolders());
+  }, []);
   const [folderFilter, setFolderFilter] = useState<string>("");
   const [saveName, setSaveName] = useState("");
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ComposedRequest, MockRule } from "@/lib/types";
 import {
   loadMockRules,
@@ -14,7 +14,11 @@ interface Props {
 }
 
 export function MockPanel({ request, onChange }: Props) {
-  const [rules, setRules] = useState<MockRule[]>(() => loadMockRules());
+  const [rules, setRules] = useState<MockRule[]>([]);
+
+  useEffect(() => {
+    setRules(loadMockRules());
+  }, []);
 
   function persist(next: MockRule[]) {
     setRules(next);
@@ -31,6 +35,7 @@ export function MockPanel({ request, onChange }: Props) {
         status: 200,
         responseHeaders: "Content-Type: application/json",
         responseBody: '{"mock": true}',
+        breakpoint: false,
       },
     ]);
   }
@@ -63,11 +68,12 @@ export function MockPanel({ request, onChange }: Props) {
           {rules.map((r) => (
             <option key={r.id} value={r.id}>
               {r.name}
+              {r.breakpoint ? " (breakpoint)" : ""}
             </option>
           ))}
         </select>
       )}
-      <ul className="max-h-36 space-y-2 overflow-auto text-xs">
+      <ul className="max-h-48 space-y-2 overflow-auto text-xs">
         {rules.map((r) => (
           <li key={r.id} className="rounded border border-[var(--border)] p-2">
             <input
@@ -93,7 +99,35 @@ export function MockPanel({ request, onChange }: Props) {
                 )
               }
             />
-            <div className="flex gap-1">
+            <textarea
+              className="mb-1 w-full font-mono"
+              placeholder="Response headers"
+              rows={2}
+              value={r.responseHeaders}
+              onChange={(e) =>
+                persist(
+                  rules.map((x) =>
+                    x.id === r.id
+                      ? { ...x, responseHeaders: e.target.value }
+                      : x
+                  )
+                )
+              }
+            />
+            <textarea
+              className="mb-1 w-full font-mono"
+              placeholder="Response body"
+              rows={2}
+              value={r.responseBody}
+              onChange={(e) =>
+                persist(
+                  rules.map((x) =>
+                    x.id === r.id ? { ...x, responseBody: e.target.value } : x
+                  )
+                )
+              }
+            />
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 type="number"
                 className="w-16 rounded border border-[var(--border)] px-1"
@@ -108,6 +142,22 @@ export function MockPanel({ request, onChange }: Props) {
                   )
                 }
               />
+              <label className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={Boolean(r.breakpoint)}
+                  onChange={(e) =>
+                    persist(
+                      rules.map((x) =>
+                        x.id === r.id
+                          ? { ...x, breakpoint: e.target.checked }
+                          : x
+                      )
+                    )
+                  }
+                />
+                Breakpoint
+              </label>
               <button
                 type="button"
                 className="text-[var(--danger)]"

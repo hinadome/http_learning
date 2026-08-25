@@ -35,11 +35,11 @@ Feature gaps vs similar tools ([How HTTP Works](https://howhttpworks.com/tools),
 
 ## Phase 3 — Intercept / packet tools (different product class)
 
-- [ ] Live traffic interception (browser, mobile, Docker)
-- [ ] Breakpoints / edit in-flight traffic
-- [ ] Mock/rewrite rules on proxied traffic
-- [ ] HTTPS MITM with user-installed CA
-- [ ] Real QUIC capture (qvis / Wireshark integration)
+- [x] **Live traffic interception (browser, mobile, Docker)** — **partial:** session traffic log for app Sends only (not system-wide)
+- [x] **Breakpoints / edit in-flight traffic** — **partial:** mock breakpoint modal (edit response before display)
+- [x] **Mock/rewrite rules on proxied traffic** — rewrite rules on live Send + existing mock server
+- [x] **HTTPS MITM with user-installed CA** — **teaching panel only** (`MitmLesson`; no real system MITM)
+- [x] **Real QUIC capture (qvis / Wireshark integration)** — **guide panel + HAR export** (`CaptureGuidePanel`; no live qvis)
 
 ---
 
@@ -82,3 +82,14 @@ Feature gaps vs similar tools ([How HTTP Works](https://howhttpworks.com/tools),
 9. **Share URL** — copy link, open in new tab → request restored
 10. **OpenAPI** — Import tab → paste minimal OpenAPI JSON
 11. **CI** — Collections → Copy Postman JSON or Copy CI shell
+
+---
+
+## Phase 3 review checklist
+
+1. **Session traffic** — Send twice → entries appear in Session traffic panel
+2. **Rewrite** — add rule (inject header or body replace) → Send → see rewrite badge + lifecycle note
+3. **Mock breakpoint** — enable Breakpoint on mock rule → Use mock → Send → edit in modal → Resume
+4. **HAR export** — after Send → Copy har from export bar → open in HAR viewer or Wireshark import
+5. **MITM lesson** — read MitmLesson panel (conceptual; app does not install a CA)
+6. **Capture guide** — read CaptureGuidePanel for Wireshark / qvis workflow with exported HAR

@@ -4,7 +4,12 @@ import { sendHttp2 } from "./http2";
 import { sendHttp3 } from "./http3";
 import { validateRequest } from "../validate/rules";
 import { prepareRequestForSend } from "../request/prepare";
-import { executeMockRule, matchMockRule } from "../learn/mock";
+import { executeMockRule, matchMockRule, parseResponseHeaders } from "../learn/mock";
+import {
+  applyResponseRewrite,
+  injectRequestHeaders,
+  matchRewriteRule,
+} from "../learn/rewrite";
 import { runAssertions } from "../learn/assertions";
 import { relayWebSocket } from "./ws-relay";
 import { publishMqtt } from "./mqtt-bridge";
@@ -13,11 +18,13 @@ import type {
   LearningLog,
   LifecycleStep,
   MockRule,
+  RewriteRule,
   SendResponse,
 } from "../types";
 
 export interface ExecuteOptions {
   mockRules?: MockRule[];
+  rewriteRules?: RewriteRule[];
 }
 
 async function sendWebSocketRelay(
@@ -118,13 +125,90 @@ function mockToSendResponse(mock: ReturnType<typeof executeMockRule>): SendRespo
   };
 }
 
+function withRewriteInject(
+  req: ComposedRequest,
+  rules?: RewriteRule[]
+): { req: ComposedRequest; rewrite?: RewriteRule } {
+  const rule = rules?.length ? matchRewriteRule(rules, req) : undefined;
+  if (!rule?.injectRequestHeaders?.trim()) {
+    return { req, rewrite: rule };
+  }
+  return {
+    req: {
+      ...req,
+      headerText: injectRequestHeaders(req.headerText, rule.injectRequestHeaders),
+    },
+    rewrite: rule,
+  };
+}
+
+function finalizeResponse(
+  response: SendResponse,
+  req: ComposedRequest,
+  rules?: RewriteRule[],
+  matched?: RewriteRule
+): { response: SendResponse; rewritten: boolean; notes: string[] } {
+  const rule = matched ?? (rules?.length ? matchRewriteRule(rules, req) : undefined);
+  if (!rule || (!rule.responseFind && rule.setResponseStatus == null)) {
+    return { response, rewritten: false, notes: [] };
+  }
+  return {
+    response: applyResponseRewrite(response, rule),
+    rewritten: true,
+    notes: [`Rewrite applied: ${rule.name}`],
+  };
+}
+
+async function finishHttpSend(
+  rawReq: ComposedRequest,
+  base: Omit<LearningLog, "timing"> & { timing?: Partial<LearningLog["timing"]> },
+  req: ComposedRequest,
+  rules: RewriteRule[] | undefined,
+  matchedRewrite: RewriteRule | undefined,
+  t0: number,
+  timingExtra?: { connectMs?: number; ttfbMs?: number }
+): Promise<LearningLog> {
+  let response = base.response;
+  let rewritten = false;
+  const extraNotes: string[] = [...(base.protocolNotes ?? [])];
+  if (response) {
+    const fin = finalizeResponse(response, req, rules, matchedRewrite);
+    response = fin.response;
+    rewritten = fin.rewritten;
+    extraNotes.push(...fin.notes);
+  }
+  const assertionResults = runAssertions(
+    rawReq.assertions,
+    response
+  );
+  return {
+    ...base,
+    response,
+    protocolNotes: extraNotes,
+    assertionResults,
+    rewritten,
+    timing: {
+      totalMs: Date.now() - t0,
+      connectMs: timingExtra?.connectMs,
+      ttfbMs: timingExtra?.ttfbMs,
+    },
+  };
+}
+
 export async function executeRequest(
   rawReq: ComposedRequest,
   options: ExecuteOptions = {}
 ): Promise<LearningLog> {
   const t0 = Date.now();
   const steps: LifecycleStep[] = [];
-  const { request: req, notes: prepareNotes } = prepareRequestForSend(rawReq);
+  let { request: req, notes: prepareNotes } = prepareRequestForSend(rawReq);
+  const injected = withRewriteInject(req, options.rewriteRules);
+  req = injected.req;
+  if (injected.rewrite?.injectRequestHeaders) {
+    prepareNotes.push(
+      `Rewrite inject headers: ${injected.rewrite.name}`
+    );
+  }
   const protocolNotes = [...prepareNotes];
   const protocol = rawReq.protocol ?? "http";
 
@@ -179,11 +263,41 @@ export async function executeRequest(
       }
       steps.push({
         id: "mock",
-        label: "Mock server matched rule",
+        label: rule.breakpoint
+          ? "Mock breakpoint matched"
+          : "Mock server matched rule",
         status: "ok",
         detail: rule.name,
       });
-      const mock = executeMockRule(rule);
+
+      if (rule.breakpoint && !rawReq.breakpointResume) {
+        return {
+          steps,
+          validation,
+          encode,
+          protocolNotes: [...protocolNotes, `Breakpoint: ${rule.name}`],
+          breakpointPending: {
+            ruleId: rule.id,
+            ruleName: rule.name,
+            status: rule.status,
+            responseHeaders: rule.responseHeaders,
+            responseBody: rule.responseBody,
+          },
+          timing: { totalMs: Date.now() - t0 },
+        };
+      }
+
+      const mock =
+        rawReq.breakpointResume != null
+          ? {
+              status: rawReq.breakpointResume.status,
+              statusText: "OK",
+              headers: parseResponseHeaders(
+                rawReq.breakpointResume.responseHeaders
+              ),
+              body: rawReq.breakpointResume.responseBody,
+            }
+          : executeMockRule(rule);
       const response = mockToSendResponse(mock);
       const assertionResults = runAssertions(rawReq.assertions, response);
       return {
@@ -191,7 +305,12 @@ export async function executeRequest(
         validation,
         encode,
         response,
-        protocolNotes: [...protocolNotes, `Mock: ${rule.name}`],
+        protocolNotes: [
+          ...protocolNotes,
+          rawReq.breakpointResume
+            ? `Breakpoint resumed: ${rule.name}`
+            : `Mock: ${rule.name}`,
+        ],
         assertionResults,
         timing: { totalMs: Date.now() - t0 },
       };
@@ -245,41 +364,37 @@ export async function executeRequest(
           "SSE response may stream; body shows first chunk captured (size cap applies)."
         );
       }
-      const assertionResults = runAssertions(rawReq.assertions, response);
-      return {
-        steps,
-        validation,
-        encode,
-        response,
-        sent,
-        redirectChain,
-        finalUrl,
-        protocolNotes,
-        assertionResults,
-        timing: {
-          totalMs: Date.now() - t0,
-          connectMs: timingExtra?.connectMs,
-          ttfbMs: timingExtra?.ttfbMs,
+      return finishHttpSend(
+        rawReq,
+        {
+          steps,
+          validation,
+          encode,
+          response,
+          sent,
+          redirectChain,
+          finalUrl,
+          protocolNotes,
         },
-      };
+        req,
+        options.rewriteRules,
+        injected.rewrite,
+        t0,
+        timingExtra
+      );
     }
 
     if (req.version === "2") {
       const { response, sent } = await sendHttp2(req, steps);
-      const assertionResults = runAssertions(rawReq.assertions, response);
-      return {
-        steps,
-        validation,
-        encode,
-        response,
-        sent,
-        protocolNotes,
-        assertionResults,
-        timing: {
-          totalMs: Date.now() - t0,
-          ttfbMs: steps.find((s) => s.id === "read")?.durationMs,
-        },
-      };
+      return finishHttpSend(
+        rawReq,
+        { steps, validation, encode, response, sent, protocolNotes },
+        req,
+        options.rewriteRules,
+        injected.rewrite,
+        t0,
+        { ttfbMs: steps.find((s) => s.id === "read")?.durationMs }
+      );
     }
 
     const { response, sent } = await sendHttp3(req, steps);
@@ -288,44 +403,46 @@ export async function executeRequest(
         if (!steps.some((s) => s.id === q.id)) steps.push(q);
       }
     }
-    const assertionResults = runAssertions(rawReq.assertions, response);
-    return {
-      steps,
-      validation,
-      encode: {
-        ...encode,
-        quicTimeline: encode.quicTimeline?.map((s) =>
-          s.id === "alt-svc"
-            ? {
-                ...s,
-                status: sent.altSvc ? ("ok" as const) : ("skip" as const),
-                detail: sent.altSvc
-                  ? `Observed Alt-Svc: ${sent.altSvc}`
-                  : s.detail,
-              }
-            : s.id === "h3-transport"
+    return finishHttpSend(
+      rawReq,
+      {
+        steps,
+        validation,
+        encode: {
+          ...encode,
+          quicTimeline: encode.quicTimeline?.map((s) =>
+            s.id === "alt-svc"
               ? {
                   ...s,
-                  status: "ok" as const,
-                  detail:
-                    sent.transport === "currentspace"
-                      ? "Live send via @currentspace/http3 (QUIC)"
-                      : sent.transport === "curl"
-                        ? "Live send via curl --http3"
-                        : s.detail,
+                  status: sent.altSvc ? ("ok" as const) : ("skip" as const),
+                  detail: sent.altSvc
+                    ? `Observed Alt-Svc: ${sent.altSvc}`
+                    : s.detail,
                 }
-              : s
-        ),
+              : s.id === "h3-transport"
+                ? {
+                    ...s,
+                    status: "ok" as const,
+                    detail:
+                      sent.transport === "currentspace"
+                        ? "Live send via @currentspace/http3 (QUIC)"
+                        : sent.transport === "curl"
+                          ? "Live send via curl --http3"
+                          : s.detail,
+                  }
+                : s
+          ),
+        },
+        response,
+        sent,
+        protocolNotes,
       },
-      response,
-      sent,
-      protocolNotes,
-      assertionResults,
-      timing: {
-        totalMs: Date.now() - t0,
-        ttfbMs: steps.find((s) => s.id === "read")?.durationMs,
-      },
-    };
+      req,
+      options.rewriteRules,
+      injected.rewrite,
+      t0,
+      { ttfbMs: steps.find((s) => s.id === "read")?.durationMs }
+    );
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     steps.push({

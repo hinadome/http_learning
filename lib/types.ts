@@ -67,6 +67,44 @@ export interface MockRule {
   status: number;
   responseHeaders: string;
   responseBody: string;
+  /** Pause on match; client edits response before display (mock only). */
+  breakpoint?: boolean;
+}
+
+export interface RewriteRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  method?: string;
+  pathPattern: string;
+  /** Extra request header lines injected before send. */
+  injectRequestHeaders?: string;
+  /** Replace substring in response body (live send). */
+  responseFind?: string;
+  responseReplace?: string;
+  /** Override response status when set. */
+  setResponseStatus?: number;
+}
+
+export interface TrafficEntry {
+  id: string;
+  at: number;
+  method: string;
+  url: string;
+  status?: number;
+  durationMs: number;
+  mocked: boolean;
+  rewritten: boolean;
+  requestHeaders: string;
+  responsePreview?: string;
+}
+
+export interface BreakpointPending {
+  ruleId: string;
+  ruleName: string;
+  status: number;
+  responseHeaders: string;
+  responseBody: string;
 }
 
 export interface EnvVariable {
@@ -121,6 +159,12 @@ export interface ComposedRequest {
   mockRuleId?: string;
   /** MQTT topic when protocol is mqtt. */
   mqttTopic?: string;
+  /** Client-edited response when resuming a mock breakpoint. */
+  breakpointResume?: {
+    status: number;
+    responseHeaders: string;
+    responseBody: string;
+  };
 }
 
 export interface ParsedRequest {
@@ -229,6 +273,8 @@ export interface LearningLog {
   error?: string;
   assertionResults?: AssertionResult[];
   protocolNotes?: string[];
+  breakpointPending?: BreakpointPending;
+  rewritten?: boolean;
   timing: {
     totalMs: number;
     dnsMs?: number;

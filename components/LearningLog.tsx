@@ -55,6 +55,11 @@ export function LearningLogView({
               {log.error}
             </div>
           )}
+          {log?.rewritten && (
+            <div className="mb-3 rounded border border-[var(--warn)]/40 bg-[var(--warn-soft)] px-3 py-2 text-sm">
+              Response modified by a rewrite rule before display.
+            </div>
+          )}
           {log?.protocolNotes && log.protocolNotes.length > 0 && (
             <ul className="mb-3 rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-xs text-[var(--muted)]">
               {log.protocolNotes.map((n, i) => (

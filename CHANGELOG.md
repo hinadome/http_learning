@@ -12,6 +12,27 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.3.0] — 2026-08-25
+
+### Added
+
+#### Phase 3 — Intercept / packet tools (educational scope)
+- **Session traffic log** — intercept-style log of Sends in the current browser tab (`sessionStorage`)
+- **Rewrite rules** — inject request headers and/or replace response body substring on live Send
+- **Mock breakpoints** — pause on mock match; edit status/headers/body before resume
+- **HAR 1.2 export** — Copy HAR from export bar after Send (Wireshark-adjacent workflow)
+- **MITM lesson** panel — conceptual HTTPS MITM / CA install (no real system proxy)
+- **Capture guide** panel — Wireshark / qvis workflow with exported HAR
+- `lib/learn/traffic-log.ts`, `lib/learn/rewrite.ts`, `lib/learn/har.ts`
+- UI: `RewritePanel`, `TrafficLogPanel`, `BreakpointModal`, `MitmLesson`, `CaptureGuidePanel`
+
+### Changed
+- Mock rules support editable response headers/body and **Breakpoint** checkbox
+- Export bar includes **Copy HAR** when a Send log is available
+- Lifecycle panel shows rewrite badge when response was modified
+
+---
+
 ## [0.2.0] — 2026-08-25
 
 ### Added

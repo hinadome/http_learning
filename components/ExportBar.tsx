@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { ComposedRequest } from "@/lib/types";
+import type { ComposedRequest, LearningLog } from "@/lib/types";
 import {
   toAxios,
   toCurl,
@@ -10,12 +10,14 @@ import {
   toPythonRequests,
   toRawHttp1,
 } from "@/lib/learn/export";
+import { toHar } from "@/lib/learn/har";
 
 interface Props {
   request: ComposedRequest;
+  log?: LearningLog | null;
 }
 
-export function ExportBar({ request }: Props) {
+export function ExportBar({ request, log }: Props) {
   const [copied, setCopied] = useState<string | null>(null);
 
   const codes = useMemo(() => {
@@ -27,11 +29,12 @@ export function ExportBar({ request }: Props) {
         python: toPythonRequests(request),
         axios: toAxios(request),
         go: toGoHttp(request),
+        har: log ? toHar(log, request) : "",
       };
     } catch {
       return null;
     }
-  }, [request]);
+  }, [request, log]);
 
   async function copy(label: string, text: string) {
     await navigator.clipboard.writeText(text);
@@ -49,6 +52,7 @@ export function ExportBar({ request }: Props) {
     ["go", codes.go],
     ["raw", codes.raw],
   ];
+  if (codes.har) buttons.push(["har", codes.har]);
 
   return (
     <div className="flex flex-wrap gap-2">

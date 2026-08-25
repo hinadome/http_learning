@@ -32,6 +32,7 @@ npm start
 | Verify against specs | Links to RFCs and MDN on issues, methods, status codes, glossary |
 | Build & reuse requests | Collections, environments (`{{var}}`), share URL, OpenAPI import |
 | Test without the network | Mock rules; post-response assertions |
+| Intercept-style debugging | Session traffic log, rewrite rules, mock breakpoints, HAR export |
 
 This is an **educational client**, not a production API tester.
 
@@ -455,7 +456,7 @@ http_checker/
 
 ### Import & export
 - **Import:** raw HTTP/1.x, curl, OpenAPI 3 JSON → collections  
-- **Export:** curl, fetch, raw HTTP/1.x, Python `requests`, axios, Go  
+- **Export:** curl, fetch, raw HTTP/1.x, Python `requests`, axios, Go, **HAR 1.2**
 - **Share URL** — encode request in `#share=…` (no account)  
 
 ### API-client style (local-only)
@@ -463,6 +464,10 @@ http_checker/
 - **Environments** — `{{variable}}` substitution before Validate/Send  
 - **Assertions** — post-response checks (status, header contains, body contains)  
 - **Mock server** — match rules on Send without network  
+- **Rewrite rules** — inject request headers / replace response body on live Send  
+- **Session traffic log** — intercept-style log of app Sends (current tab)  
+- **Mock breakpoints** — pause on mock match, edit response before display  
+- **MITM & capture guides** — teaching panels (no system CA / no live qvis)  
 - **CI export** — Postman collection JSON + bash curl script from collections  
 
 ## Browser storage (`localStorage`)
@@ -475,6 +480,13 @@ http_checker/
 | `http-learning-checker-environments` | Environment variable sets |
 | `http-learning-checker-active-env` | Selected environment id |
 | `http-learning-checker-mocks` | Mock response rules |
+| `http-learning-checker-rewrites` | Rewrite rules (request inject / response replace) |
+
+**Session storage** (`sessionStorage`):
+
+| Key | Contents |
+|-----|----------|
+| `http-learning-checker-traffic-session` | Session traffic log (last 100 Sends in tab) |
 
 ## History storage
 
@@ -504,7 +516,10 @@ http_checker/
 8. **Environments** → `{{baseUrl}}/get` → Send.  
 9. **Lab: Redirect (302)** → with/without Follow redirects.  
 10. **Mock** panel → rule + Use mock → Send (no network).  
-11. See [ROADMAP.md](./ROADMAP.md) Phase 1 & 2 review checklists.
+11. **Rewrite** → inject header or body replace → Send → lifecycle rewrite note.  
+12. **Breakpoint** → mock rule with Breakpoint → edit response in modal.  
+13. **Session traffic** + **Copy HAR** after Send.  
+14. See [ROADMAP.md](./ROADMAP.md) Phase 1–3 review checklists.
 
 ## Stack
 
@@ -518,7 +533,7 @@ http_checker/
 
 ## Roadmap
 
-See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1** and **Phase 2** are complete; Phase 3–4 track intercept tools and deeper protocol labs.
+See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1–3** are complete (Phase 3 is educational/partial vs full HTTP Toolkit); Phase 4 tracks deeper protocol labs.
 
 ## License
 

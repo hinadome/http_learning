@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
+  BreakpointPending,
   CollectionEntry,
   ComposedRequest,
   CompareEncodeResult,
@@ -9,6 +10,7 @@ import type {
   EncodeResult,
   Environment,
   LearningLog,
+  TrafficEntry,
   ValidationResult,
   HistoryItem,
 } from "@/lib/types";
@@ -23,6 +25,12 @@ import {
 } from "@/lib/learn/environments";
 import { applyEnvironment, envToMap } from "@/lib/env/substitute";
 import { loadMockRules } from "@/lib/learn/mock";
+import { loadRewriteRules } from "@/lib/learn/rewrite";
+import {
+  loadTrafficSession,
+  newTrafficId,
+  pushTrafficEntry,
+} from "@/lib/learn/traffic-log";
 import { saveCollections, loadCollections } from "@/lib/learn/collections";
 import { parseShareFromHash } from "@/lib/learn/share";
 import { prepareRequestForSend } from "@/lib/request/prepare";
@@ -38,6 +46,11 @@ import { EnvironmentsPanel } from "@/components/EnvironmentsPanel";
 import { CollectionsPanel } from "@/components/CollectionsPanel";
 import { AssertionsPanel } from "@/components/AssertionsPanel";
 import { MockPanel } from "@/components/MockPanel";
+import { RewritePanel } from "@/components/RewritePanel";
+import { TrafficLogPanel } from "@/components/TrafficLogPanel";
+import { BreakpointModal } from "@/components/BreakpointModal";
+import { MitmLesson } from "@/components/MitmLesson";
+import { CaptureGuidePanel } from "@/components/CaptureGuidePanel";
 import { ShareButton } from "@/components/ShareButton";
 
 const DEFAULT: ComposedRequest = {
@@ -73,6 +86,9 @@ export default function HomePage() {
     curlHttp3: boolean;
     currentspace: boolean;
   } | null>(null);
+  const [traffic, setTraffic] = useState<TrafficEntry[]>([]);
+  const [breakpointPending, setBreakpointPending] =
+    useState<BreakpointPending | null>(null);
 
   const resolvedRequest = useMemo(() => {
     const active = getActiveEnvironment(environments);
@@ -89,6 +105,7 @@ export default function HomePage() {
     setHistory(loadHistory());
     setEnvironments(loadEnvironments());
     setActiveEnvId(loadActiveEnvId());
+    setTraffic(loadTrafficSession());
     fetch("/api/http3-support")
       .then((r) => r.json())
       .then(setHttp3Support)
@@ -195,7 +212,9 @@ export default function HomePage() {
     }
   }
 
-  async function send() {
+  async function send(
+    breakpointResume?: ComposedRequest["breakpointResume"]
+  ) {
     setBusy("send");
     setCompare(null);
     const payload = {
@@ -203,6 +222,7 @@ export default function HomePage() {
       assertions: request.assertions,
       useMock: request.useMock,
       mockRuleId: request.mockRuleId,
+      breakpointResume,
     };
     try {
       const res = await fetch("/api/send", {
@@ -211,11 +231,20 @@ export default function HomePage() {
         body: JSON.stringify({
           ...payload,
           mockRules: loadMockRules(),
+          rewriteRules: loadRewriteRules(),
         }),
       });
       const data = (await res.json()) as LearningLog;
       setLog(data);
       setValidation(data.validation);
+
+      if (data.breakpointPending) {
+        setBreakpointPending(data.breakpointPending);
+        setTab("lifecycle");
+        return;
+      }
+
+      setBreakpointPending(null);
       setHistory(
         pushHistory(
           request,
@@ -223,6 +252,20 @@ export default function HomePage() {
             data.response?.status ?? data.error ?? "?"
           }`
         )
+      );
+      setTraffic(
+        pushTrafficEntry({
+          id: newTrafficId(),
+          at: Date.now(),
+          method: payload.method,
+          url: payload.url,
+          status: data.response?.status,
+          durationMs: data.timing.totalMs,
+          mocked: Boolean(request.useMock),
+          rewritten: Boolean(data.rewritten),
+          requestHeaders: payload.headerText,
+          responsePreview: data.response?.body?.slice(0, 200),
+        })
       );
       setTab(data.response ? "response" : "lifecycle");
     } finally {
@@ -338,7 +381,7 @@ export default function HomePage() {
             <button
               type="button"
               disabled={Boolean(busy)}
-              onClick={send}
+              onClick={() => send()}
               className="rounded bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               {busy === "send" ? "Sending…" : "Send"}
@@ -346,7 +389,7 @@ export default function HomePage() {
             <ShareButton request={request} />
           </div>
 
-          <ExportBar request={resolvedRequest} />
+          <ExportBar request={resolvedRequest} log={log} />
           <DocsPanel version={request.version} />
           <ValidationPanel result={validation} />
 
@@ -372,6 +415,11 @@ export default function HomePage() {
 
           <AssertionsPanel value={request} onChange={setRequest} />
           <MockPanel request={request} onChange={setRequest} />
+          <RewritePanel />
+          <TrafficLogPanel
+            entries={traffic}
+            onClear={() => setTraffic([])}
+          />
 
           {history.length > 0 && (
             <div>
@@ -429,8 +477,18 @@ export default function HomePage() {
             compare?.pair === "2-3") && <CompressionLesson />}
 
           <MultiplexLesson />
+          <MitmLesson />
+          <CaptureGuidePanel />
         </div>
       </div>
+
+      {breakpointPending && (
+        <BreakpointModal
+          pending={breakpointPending}
+          onResume={(edited) => send(edited)}
+          onCancel={() => setBreakpointPending(null)}
+        />
+      )}
     </main>
   );
 }
