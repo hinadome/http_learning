@@ -4,13 +4,23 @@ import type {
   ComparePair,
   EncodeResult,
 } from "../types";
-import { encodeHttp1 } from "./http1";
+import { encodeHttp1, encodeHttp1Chunked } from "./http1";
 import { encodeHttp2 } from "./http2-frames";
+import { encodeHttp2WithPush, encodeHttp2WithTrailers } from "./http2-labs";
 import { encodeHttp3 } from "./http3-frames";
 
 export type { ComparePair };
 
 export function encodeRequest(req: ComposedRequest): EncodeResult {
+  if (req.encodeLab === "chunked" && (req.version === "1.0" || req.version === "1.1")) {
+    return encodeHttp1Chunked(req);
+  }
+  if (req.version === "2" && req.encodeLab === "h2-trailers") {
+    return encodeHttp2WithTrailers(req);
+  }
+  if (req.version === "2" && req.encodeLab === "h2-push") {
+    return encodeHttp2WithPush(req);
+  }
   switch (req.version) {
     case "1.0":
     case "1.1":

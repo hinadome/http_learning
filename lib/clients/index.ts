@@ -345,7 +345,7 @@ export async function executeRequest(
     }
 
     if (req.version === "1.0" || req.version === "1.1") {
-      const { response, sent, redirectChain, finalUrl, timingExtra } =
+      const { response, sent, redirectChain, finalUrl, timingExtra, tlsInfo } =
         await sendHttp1(req, steps);
       if (sent.wireText) {
         encode = {
@@ -375,6 +375,7 @@ export async function executeRequest(
           redirectChain,
           finalUrl,
           protocolNotes,
+          tlsInfo,
         },
         req,
         options.rewriteRules,
@@ -385,10 +386,10 @@ export async function executeRequest(
     }
 
     if (req.version === "2") {
-      const { response, sent } = await sendHttp2(req, steps);
+      const { response, sent, tlsInfo } = await sendHttp2(req, steps);
       return finishHttpSend(
         rawReq,
-        { steps, validation, encode, response, sent, protocolNotes },
+        { steps, validation, encode, response, sent, protocolNotes, tlsInfo },
         req,
         options.rewriteRules,
         injected.rewrite,

@@ -74,6 +74,72 @@ export function encodeHttp1(req: ComposedRequest): EncodeResult {
   };
 }
 
+/** Chunked Transfer-Encoding wire preview (educational). */
+export function encodeHttp1Chunked(req: ComposedRequest): EncodeResult {
+  const parsed = parseComposedRequest(req);
+  const versionToken = parsed.version === "1.0" ? "HTTP/1.0" : "HTTP/1.1";
+  const body = parsed.body || "hello";
+  const chunkHex = Buffer.byteLength(body, "utf8").toString(16);
+  const chunkedBody = `${chunkHex}\r\n${body}\r\n0\r\n\r\n`;
+
+  const headerLines: string[] = [];
+  for (const h of parsed.headers) {
+    if (!h.name) continue;
+    headerLines.push(`${h.name}: ${h.value}`);
+  }
+  if (
+    !headerLines.some((l) => l.toLowerCase().startsWith("transfer-encoding:"))
+  ) {
+    headerLines.push("Transfer-Encoding: chunked");
+  }
+  if (!headerLines.some((l) => l.toLowerCase().startsWith("host:"))) {
+    headerLines.push(`Host: ${parsed.target.hostname}`);
+  }
+
+  const requestLine = `${parsed.method} ${parsed.pathWithQuery} ${versionToken}`;
+  const textWire =
+    requestLine +
+    "\r\n" +
+    headerLines.join("\r\n") +
+    "\r\n\r\n" +
+    chunkedBody;
+  const buf = Buffer.from(textWire, "utf8");
+
+  return {
+    version: parsed.version,
+    textWire,
+    textWireHex: bufferToHex(buf),
+    frames: [
+      {
+        name: "HTTP/1.x chunked message",
+        type: "TEXT",
+        hex: bufferToHex(buf),
+        asciiPreview: bufferToAsciiPreview(buf.slice(0, 200)),
+        annotations: [
+          {
+            offset: 0,
+            length: Buffer.byteLength(requestLine + "\r\n", "utf8"),
+            label: "Request line",
+            detail: requestLine,
+          },
+          {
+            offset: textWire.indexOf(chunkedBody),
+            length: chunkedBody.length,
+            label: "Chunked body",
+            detail: "size hex + CRLF + data + … + 0 CRLF CRLF",
+          },
+        ],
+        explanation:
+          "Chunked encoding: each chunk is size-in-hex + CRLF + data + CRLF; terminated by 0 + CRLF + CRLF.",
+      },
+    ],
+    notes: [
+      "Chunked lab: body is framed in chunks instead of Content-Length.",
+      "This app's Send path may still use Content-Length unless Transfer-Encoding is set; use Encode to study wire format.",
+    ],
+  };
+}
+
 /** Build wire message used when actually sending (may inject Host / Content-Length). */
 export function buildHttp1WireForSend(
   req: ComposedRequest,

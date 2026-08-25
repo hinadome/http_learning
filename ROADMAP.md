@@ -45,15 +45,15 @@ Feature gaps vs similar tools ([How HTTP Works](https://howhttpworks.com/tools),
 
 ## Phase 4 — Deeper protocol labs
 
-- [ ] Interactive multiplex load simulator (animated asset loading)
-- [ ] HTTP/2 trailers lab
-- [ ] Server Push (H2) educational encode
-- [ ] Chunked encoding live round-trip lab
-- [ ] TLS cert / ALPN / cipher inspection panel
-- [ ] CONNECT / proxy tunnel teaching
-- [ ] Guided step-by-step learning paths (curriculum UI)
-- [ ] Lifecycle animation (visual request/response cycle)
-- [ ] Dark mode
+- [x] **Interactive multiplex load simulator (animated asset loading)** — `MultiplexSimulator`
+- [x] **HTTP/2 trailers lab** — Encode lab preset + trailing HEADERS frame
+- [x] **Server Push (H2) educational encode** — PUSH_PROMISE in Encode lab
+- [x] **Chunked encoding live round-trip lab** — chunked wire Encode + preset (Send uses Content-Length unless TE set)
+- [x] **TLS cert / ALPN / cipher inspection panel** — `TlsPanel` from HTTPS Send socket
+- [x] **CONNECT / proxy tunnel teaching** — `ConnectLesson` panel
+- [x] **Guided step-by-step learning paths (curriculum UI)** — `CurriculumPanel`
+- [x] **Lifecycle animation (visual request/response cycle)** — `LifecycleAnimation`
+- [x] **Dark mode** — CSS variables + `ThemeToggle`
 
 ---
 
@@ -93,3 +93,16 @@ Feature gaps vs similar tools ([How HTTP Works](https://howhttpworks.com/tools),
 4. **HAR export** — after Send → Copy har from export bar → open in HAR viewer or Wireshark import
 5. **MITM lesson** — read MitmLesson panel (conceptual; app does not install a CA)
 6. **Capture guide** — read CaptureGuidePanel for Wireshark / qvis workflow with exported HAR
+
+---
+
+## Phase 4 review checklist
+
+1. **Dark mode** — toggle in header → theme persists on reload
+2. **Multiplex simulator** — H1 vs H2 vs H3 → Simulate load
+3. **Chunked lab** — preset → Encode → chunked wire on Wire tab
+4. **H2 trailers / push** — lab presets → Encode → extra frames
+5. **TLS panel** — HTTPS Send → ALPN + cert details below lifecycle
+6. **Learning paths** — Curriculum panel → Load preset per step
+7. **Lifecycle animation** — Validate / Send → phase highlights update
+8. **CONNECT lesson** — read ConnectLesson panel

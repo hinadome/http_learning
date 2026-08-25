@@ -33,6 +33,7 @@ npm start
 | Build & reuse requests | Collections, environments (`{{var}}`), share URL, OpenAPI import |
 | Test without the network | Mock rules; post-response assertions |
 | Intercept-style debugging | Session traffic log, rewrite rules, mock breakpoints, HAR export |
+| Deeper protocol labs | Multiplex simulator, H2 trailers/push encode, TLS panel, curriculum, dark mode |
 
 This is an **educational client**, not a production API tester.
 
@@ -520,6 +521,7 @@ http_checker/
 12. **Breakpoint** → mock rule with Breakpoint → edit response in modal.  
 13. **Session traffic** + **Copy HAR** after Send.  
 14. See [ROADMAP.md](./ROADMAP.md) Phase 1–3 review checklists.
+15. **Phase 4** — dark mode, multiplex simulator, chunked/H2 encode labs, TLS panel, curriculum paths.
 
 ## Stack
 
@@ -533,7 +535,7 @@ http_checker/
 
 ## Roadmap
 
-See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1–3** are complete (Phase 3 is educational/partial vs full HTTP Toolkit); Phase 4 tracks deeper protocol labs.
+See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1–4** are complete.
 
 ## License
 

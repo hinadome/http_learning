@@ -25,6 +25,7 @@ function base(
     bodyType: partial.bodyType ?? "text",
     graphqlVariables: partial.graphqlVariables ?? "{}",
     multipartFields: partial.multipartFields ?? [],
+    encodeLab: partial.encodeLab,
   };
 }
 
@@ -248,6 +249,49 @@ User-Agent: HTTP-Learning-Checker/1.0`,
       headerText: `Host: httpbin.org
 Accept: application/json
 User-Agent: HTTP-Learning-Checker/1.0`,
+    }),
+  },
+  {
+    id: "chunked-encoding",
+    title: "Lab: Chunked encoding",
+    description:
+      "Transfer-Encoding: chunked — Encode to see chunked wire format.",
+    request: base({
+      version: "1.1",
+      method: "POST",
+      url: "https://httpbin.org/post",
+      headerText: `Host: httpbin.org
+Content-Type: text/plain
+Transfer-Encoding: chunked`,
+      body: "chunked payload",
+      encodeLab: "chunked",
+    }),
+  },
+  {
+    id: "h2-trailers",
+    title: "Lab: H2 trailers encode",
+    description: "HTTP/2 trailing HEADERS frame after DATA (Encode tab).",
+    request: base({
+      version: "2",
+      method: "POST",
+      url: "https://httpbin.org/post",
+      headerText: `Content-Type: application/json
+Accept: application/json`,
+      body: '{"trailers": true}',
+      encodeLab: "h2-trailers",
+    }),
+  },
+  {
+    id: "h2-push",
+    title: "Lab: H2 server push encode",
+    description: "Educational PUSH_PROMISE frame in Encode view.",
+    request: base({
+      version: "2",
+      method: "GET",
+      url: "https://httpbin.org/get",
+      headerText: `Accept: text/html
+User-Agent: HTTP-Learning-Checker/1.0`,
+      encodeLab: "h2-push",
     }),
   },
 ];

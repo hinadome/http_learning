@@ -13,7 +13,9 @@ import type {
   LifecycleStep,
   RedirectHop,
   SendResponse,
+  TlsInfo,
 } from "../types";
+import { extractTlsInfo } from "../tls/inspect";
 import {
   buildRedirectHop,
   isRedirectStatus,
@@ -69,6 +71,7 @@ interface SingleSendResult {
   sent: SentOnWire;
   ttfbMs: number;
   connectMs: number;
+  tlsInfo?: TlsInfo;
 }
 
 async function sendHttp1Once(
@@ -103,6 +106,7 @@ async function sendHttp1Once(
   const started = Date.now();
   let connectMs = 0;
   let ttfbMs = 0;
+  let tlsInfo: TlsInfo | undefined;
 
   const response = await new Promise<SendResponse>((resolve, reject) => {
     const request: ClientRequest = lib.request(
@@ -142,6 +146,9 @@ async function sendHttp1Once(
     request.on("socket", (socket) => {
       socket.on("connect", () => {
         connectMs = Date.now() - started;
+      });
+      socket.on("secureConnect", () => {
+        tlsInfo = extractTlsInfo(socket);
       });
     });
 
@@ -212,7 +219,7 @@ async function sendHttp1Once(
     transport: "node-http1",
   };
 
-  return { response, sent, ttfbMs, connectMs };
+  return { response, sent, ttfbMs, connectMs, tlsInfo };
 }
 
 function getLocationHeader(
@@ -234,6 +241,7 @@ export async function sendHttp1(
   sent: SentOnWire;
   redirectChain?: RedirectHop[];
   finalUrl?: string;
+  tlsInfo?: TlsInfo;
   timingExtra?: { connectMs?: number; ttfbMs?: number };
 }> {
   const parsed = parseComposedRequest(req);
@@ -338,6 +346,7 @@ export async function sendHttp1(
     sent: result.sent,
     redirectChain: redirectChain.length ? redirectChain : undefined,
     finalUrl: redirectChain.length ? currentUrl : undefined,
+    tlsInfo: result.tlsInfo,
     timingExtra: {
       connectMs: result.connectMs,
       ttfbMs: result.ttfbMs,

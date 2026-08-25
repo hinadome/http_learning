@@ -1,5 +1,19 @@
 export type HttpVersion = "1.0" | "1.1" | "2" | "3";
 
+/** Optional encode-only lab mode (Wire tab). */
+export type EncodeLab = "chunked" | "h2-trailers" | "h2-push";
+
+export interface TlsInfo {
+  protocol?: string;
+  alpnProtocol?: string;
+  cipher?: { name: string; version: string };
+  authorized?: boolean;
+  subject?: string;
+  issuer?: string;
+  validFrom?: string;
+  validTo?: string;
+}
+
 export type RequestProtocol =
   | "http"
   | "graphql"
@@ -165,6 +179,8 @@ export interface ComposedRequest {
     responseHeaders: string;
     responseBody: string;
   };
+  /** Wire-tab lab: chunked body, H2 trailers, or H2 push frames. */
+  encodeLab?: EncodeLab;
 }
 
 export interface ParsedRequest {
@@ -275,6 +291,7 @@ export interface LearningLog {
   protocolNotes?: string[];
   breakpointPending?: BreakpointPending;
   rewritten?: boolean;
+  tlsInfo?: TlsInfo;
   timing: {
     totalMs: number;
     dnsMs?: number;

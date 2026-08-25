@@ -52,6 +52,12 @@ import { BreakpointModal } from "@/components/BreakpointModal";
 import { MitmLesson } from "@/components/MitmLesson";
 import { CaptureGuidePanel } from "@/components/CaptureGuidePanel";
 import { ShareButton } from "@/components/ShareButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { MultiplexSimulator } from "@/components/MultiplexSimulator";
+import { LifecycleAnimation } from "@/components/LifecycleAnimation";
+import { TlsPanel } from "@/components/TlsPanel";
+import { ConnectLesson } from "@/components/ConnectLesson";
+import { CurriculumPanel } from "@/components/CurriculumPanel";
 
 const DEFAULT: ComposedRequest = {
   version: "1.1",
@@ -308,6 +314,9 @@ export default function HomePage() {
             {http3Support.currentspace ? " · @currentspace/http3" : ""}
           </p>
         )}
+        <div className="flex flex-wrap gap-2">
+          <ThemeToggle />
+        </div>
       </header>
 
       <div className="flex flex-wrap gap-2">
@@ -420,6 +429,14 @@ export default function HomePage() {
             entries={traffic}
             onClear={() => setTraffic([])}
           />
+          <CurriculumPanel
+            onLoadPreset={(req) => {
+              setRequest(req);
+              setValidation(null);
+              setLog(null);
+              setCompare(null);
+            }}
+          />
 
           {history.length > 0 && (
             <div>
@@ -477,7 +494,14 @@ export default function HomePage() {
             compare?.pair === "2-3") && <CompressionLesson />}
 
           <MultiplexLesson />
+          <MultiplexSimulator />
+          <LifecycleAnimation
+            steps={log?.steps ?? []}
+            hasResponse={Boolean(log?.response)}
+          />
+          {log?.tlsInfo && <TlsPanel tls={log.tlsInfo} />}
           <MitmLesson />
+          <ConnectLesson />
           <CaptureGuidePanel />
         </div>
       </div>

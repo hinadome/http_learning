@@ -9,7 +9,9 @@ import type {
   ComposedRequest,
   LifecycleStep,
   SendResponse,
+  TlsInfo,
 } from "../types";
+import { extractTlsInfo } from "../tls/inspect";
 import { getHttp2PseudoHeaders } from "../encode/http2-frames";
 import { curlFromSent, type SentOnWire } from "./sent";
 
@@ -25,7 +27,7 @@ const FORBIDDEN = new Set([
 export async function sendHttp2(
   req: ComposedRequest,
   steps: LifecycleStep[]
-): Promise<{ response: SendResponse; sent: SentOnWire }> {
+): Promise<{ response: SendResponse; sent: SentOnWire; tlsInfo?: TlsInfo }> {
   const parsed = parseComposedRequest(req);
   if (parsed.target.protocol !== "https:") {
     throw new Error("HTTP/2 client in this app requires https:// (ALPN h2 over TLS).");
@@ -107,6 +109,8 @@ export async function sendHttp2(
       detail: `Connected to ${authority}`,
     });
 
+    const tlsInfo = extractTlsInfo(client.socket);
+
     const response = await new Promise<SendResponse>((resolve, reject) => {
       const stream = client.request(headers, { endStream: !parsed.body });
       const responseHeaders: Record<string, string | string[]> = {};
@@ -180,7 +184,7 @@ export async function sendHttp2(
       }
     });
 
-    return { response, sent };
+    return { response, sent, tlsInfo };
   } finally {
     client.close();
   }

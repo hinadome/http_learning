@@ -12,6 +12,22 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.4.0] — 2026-08-25
+
+### Added
+
+#### Phase 4 — Deeper protocol labs
+- **Dark mode** — theme toggle + `prefers-color-scheme` + localStorage (no hydration flash)
+- **Multiplex load simulator** — animated H1 vs H2/H3 asset loading demo
+- **Lifecycle animation** — visual compose → response phase tracker
+- **Chunked encoding lab** — chunked wire Encode preset
+- **HTTP/2 trailers & server push** — educational extra frames in Encode lab
+- **TLS / ALPN panel** — certificate, cipher, ALPN from HTTPS Send socket
+- **CONNECT tunnel lesson** — proxy CONNECT teaching panel
+- **Learning paths (curriculum UI)** — guided presets per topic
+
+---
+
 ## [0.3.0] — 2026-08-25
 
 ### Added
