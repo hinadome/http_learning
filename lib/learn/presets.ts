@@ -19,6 +19,12 @@ function base(
     body: partial.body ?? "",
     allowPrivateTargets: false,
     sendAnyway: false,
+    followRedirects: partial.followRedirects ?? false,
+    maxRedirects: partial.maxRedirects ?? 5,
+    protocol: partial.protocol ?? "http",
+    bodyType: partial.bodyType ?? "text",
+    graphqlVariables: partial.graphqlVariables ?? "{}",
+    multipartFields: partial.multipartFields ?? [],
   };
 }
 
@@ -213,6 +219,35 @@ User-Agent: HTTP-Learning-Checker/1.0`,
       url: "https://httpbin.org/get",
       headerText: `Connection: keep-alive
 Accept: */*`,
+    }),
+  },
+  {
+    id: "redirect-302",
+    title: "Lab: Redirect (302)",
+    description:
+      "httpbin /redirect/2 — Send without follow to see 302 + Location; enable Follow redirects to see chain.",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://httpbin.org/redirect/2",
+      headerText: `Host: httpbin.org
+Accept: application/json
+User-Agent: HTTP-Learning-Checker/1.0`,
+      followRedirects: false,
+    }),
+  },
+  {
+    id: "set-cookie-response",
+    title: "Lab: Set-Cookie response",
+    description:
+      "httpbin /cookies/set — inspect Set-Cookie teaching panel on Response tab.",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://httpbin.org/cookies/set?session=abc123&theme=dark",
+      headerText: `Host: httpbin.org
+Accept: application/json
+User-Agent: HTTP-Learning-Checker/1.0`,
     }),
   },
 ];

@@ -6,15 +6,23 @@ import { docsForHeader, statusDocs } from "@/lib/learn/docs";
 import { LifecycleTimeline } from "./LifecycleTimeline";
 import { BinaryFrameView } from "./BinaryFrameView";
 import { DocLinks } from "./DocLinks";
+import { CookieTeachingPanel } from "./CookieTeachingPanel";
 
 interface Props {
   log: LearningLog | null;
   compare: CompareEncodeResult | null;
   tab: "lifecycle" | "wire" | "response";
   onTab: (t: "lifecycle" | "wire" | "response") => void;
+  requestUrl?: string;
 }
 
-export function LearningLogView({ log, compare, tab, onTab }: Props) {
+export function LearningLogView({
+  log,
+  compare,
+  tab,
+  onTab,
+  requestUrl,
+}: Props) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-2 border-b border-[var(--border)] pb-2">
@@ -47,13 +55,15 @@ export function LearningLogView({ log, compare, tab, onTab }: Props) {
               {log.error}
             </div>
           )}
-          <LifecycleTimeline steps={log?.steps ?? []} />
-          {log && (
-            <p className="mt-2 text-xs text-[var(--muted)]">
-              Total {log.timing.totalMs} ms
-              {log.timing.ttfbMs != null ? ` · TTFB ${log.timing.ttfbMs} ms` : ""}
-            </p>
+          {log?.protocolNotes && log.protocolNotes.length > 0 && (
+            <ul className="mb-3 rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-xs text-[var(--muted)]">
+              {log.protocolNotes.map((n, i) => (
+                <li key={i}>{n}</li>
+              ))}
+            </ul>
           )}
+          <LifecycleTimeline steps={log?.steps ?? []} />
+          {log && <TimingBreakdown timing={log.timing} />}
         </div>
       )}
 
@@ -66,13 +76,50 @@ export function LearningLogView({ log, compare, tab, onTab }: Props) {
       )}
 
       {tab === "response" && (
-        <ResponseView log={log} />
+        <ResponseView log={log} requestUrl={requestUrl} />
       )}
     </section>
   );
 }
 
-function ResponseView({ log }: { log: LearningLog | null }) {
+function TimingBreakdown({
+  timing,
+}: {
+  timing: LearningLog["timing"];
+}) {
+  const rows = [
+    { label: "Total", ms: timing.totalMs },
+    { label: "Connect", ms: timing.connectMs },
+    { label: "TTFB", ms: timing.ttfbMs },
+    { label: "DNS", ms: timing.dnsMs },
+  ].filter((r) => r.ms != null && r.ms > 0);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="mt-3 rounded border border-[var(--border)] bg-[var(--panel)] p-3">
+      <h5 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+        Timing
+      </h5>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
+        {rows.map((r) => (
+          <div key={r.label}>
+            <dt className="text-[var(--muted)]">{r.label}</dt>
+            <dd className="font-mono font-medium">{r.ms} ms</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+function ResponseView({
+  log,
+  requestUrl,
+}: {
+  log: LearningLog | null;
+  requestUrl?: string;
+}) {
   const res = log?.response;
   if (!res) {
     return (
@@ -84,6 +131,12 @@ function ResponseView({ log }: { log: LearningLog | null }) {
 
   const sc = statusClass(res.status);
   const statusDoc = statusDocs(res.status);
+  const isRedirect = res.status >= 300 && res.status < 400;
+  const locEntry = Object.entries(res.headers).find(
+    ([k]) => k.toLowerCase() === "location"
+  );
+  const locRaw = locEntry?.[1];
+  const locStr = Array.isArray(locRaw) ? locRaw[0] : locRaw;
 
   return (
     <div className="flex flex-col gap-4">
@@ -111,17 +164,96 @@ function ResponseView({ log }: { log: LearningLog | null }) {
             {res.httpVersionNegotiated}
           </span>
         )}
-        {res.streamId != null && (
-          <span className="text-xs text-[var(--muted)]">
-            stream {res.streamId}
-          </span>
-        )}
         <span className="text-xs text-[var(--muted)]">
           {res.sizeBytes} bytes
           {res.bodyTruncated ? " (truncated)" : ""}
         </span>
       </div>
-      <DocLinks docs={[statusDoc]} className="mt-0" />
+
+      <div className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm">
+        <p className="font-medium">Status code teaching</p>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          {res.status} is in the {sc.label} class. {sc.summary}
+          {isRedirect &&
+            " Clients may follow the Location header on a subsequent request."}
+        </p>
+        <DocLinks docs={[statusDoc]} className="mt-1" />
+      </div>
+
+      {isRedirect && locStr && (
+        <div className="rounded border border-[var(--info)]/40 bg-[var(--accent-soft)] px-3 py-2 text-sm">
+          <p className="font-medium">Redirect (3xx)</p>
+          <p className="mt-1 font-mono text-xs break-all">
+            Location: {locStr}
+          </p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Enable <strong>Follow redirects</strong> on HTTP/1.x to chase this
+            hop and see the chain below.
+          </p>
+          <DocLinks
+            docs={[
+              {
+                label: "MDN: Location",
+                url: "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Location",
+                source: "MDN",
+              },
+            ]}
+          />
+        </div>
+      )}
+
+      {log.redirectChain && log.redirectChain.length > 0 && (
+        <div>
+          <h5 className="mb-2 text-sm font-medium text-[var(--muted)]">
+            Redirect chain
+          </h5>
+          <ol className="flex flex-col gap-1 text-xs">
+            {log.redirectChain.map((h) => (
+              <li
+                key={h.hop}
+                className="rounded border border-[var(--border)] px-2 py-1.5 font-mono"
+              >
+                {h.hop}. {h.status} {h.statusText} —{" "}
+                <span className="text-[var(--muted)]">{h.url}</span>
+                {" → "}
+                {h.location}
+              </li>
+            ))}
+          </ol>
+          {log.finalUrl && (
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              Final URL: <span className="font-mono">{log.finalUrl}</span>
+            </p>
+          )}
+        </div>
+      )}
+
+      <CookieTeachingPanel
+        headers={res.headers}
+        requestUrl={requestUrl ?? log.finalUrl ?? ""}
+      />
+
+      {log.assertionResults && log.assertionResults.length > 0 && (
+        <div>
+          <h5 className="mb-2 text-sm font-medium text-[var(--muted)]">
+            Assertions
+          </h5>
+          <ul className="flex flex-col gap-1 text-xs">
+            {log.assertionResults.map((a) => (
+              <li
+                key={a.id}
+                className={`rounded border px-2 py-1 ${
+                  a.passed
+                    ? "border-[var(--ok)]/50 text-[var(--ok)]"
+                    : "border-[var(--danger)]/50 text-[var(--danger)]"
+                }`}
+              >
+                {a.passed ? "✓" : "✗"} {a.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div>
         <h5 className="mb-2 text-sm font-medium text-[var(--muted)]">
@@ -131,10 +263,15 @@ function ResponseView({ log }: { log: LearningLog | null }) {
           {Object.entries(res.headers).map(([name, value]) => {
             const tip = HEADER_TIPS[name.toLowerCase()];
             const headerDoc = docsForHeader(name);
+            const isSetCookie = name.toLowerCase() === "set-cookie";
             return (
               <li
                 key={name}
-                className="rounded border border-[var(--border)] px-2 py-1.5 text-sm"
+                className={`rounded border px-2 py-1.5 text-sm ${
+                  isSetCookie
+                    ? "border-[var(--warn)]/50 bg-[var(--warn-soft)]"
+                    : "border-[var(--border)]"
+                }`}
                 title={tip}
               >
                 <span className="font-mono text-[var(--accent)]">{name}</span>:{" "}

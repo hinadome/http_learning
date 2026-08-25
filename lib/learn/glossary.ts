@@ -74,6 +74,8 @@ export const HEADER_TIPS: Record<string, string> = {
   "user-agent": "Identifies the client software.",
   authorization: "Credentials for the request (e.g. Bearer token). Treat as secret.",
   cookie: "Stored cookies the browser would send for this origin.",
+  "set-cookie": "Server directive to store a cookie; may appear multiple times.",
+  location: "Redirect target URL for 3xx responses.",
   "cache-control": "Caching directives for intermediaries and browsers.",
 };
 

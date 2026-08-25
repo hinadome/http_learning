@@ -12,6 +12,47 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.2.0] — 2026-08-25
+
+### Added
+
+#### Phase 1 — Educational UX
+- **Request editor tabs:** Params, Auth, Import (raw HTTP, curl, OpenAPI)
+- **Query params UI** — add/toggle parameters; stable row ids while typing
+- **Auth helpers** — Basic, Bearer, API key (header or query)
+- **Raw HTTP paste parser** and **curl import**
+- **Set-Cookie teaching panel** on Response tab (`lib/learn/cookies.ts`)
+- **Redirect chain** — optional Follow redirects (HTTP/1.x) + presets
+- **Response callouts** — status teaching, 3xx + Location, timing breakdown
+- **Multiplex lesson** panel (H1 vs H2 vs H3)
+- Presets: **Lab: Redirect (302)**, **Lab: Set-Cookie response**
+- [ROADMAP.md](./ROADMAP.md) with Phase 1–4 checklists
+
+#### Phase 2 — API client features (local-only)
+- **Collections / folders** — save/load requests in `localStorage`
+- **Environments** — `{{var}}` substitution (`lib/env/substitute.ts`)
+- **Assertions** — post-response status / header / body checks (no JS sandbox)
+- **Code generation** — Python `requests`, axios, Go (+ curl, fetch, raw)
+- **Protocol selector** — GraphQL, WebSocket relay, SSE, gRPC gateway POST, MQTT bridge
+- **Multipart form-data** — field builder with generated boundary
+- **Mock server** — local rules matched on Send without network
+- **Share URL** — base64 request in `#share=` hash
+- **CI export** — Postman collection JSON + bash curl script
+- **OpenAPI 3 import** — paths → collection + load first operation
+- API routes: `/api/ws`, `/api/mqtt`
+- Dependencies: `ws`, `mqtt`
+
+### Changed
+- `app/page.tsx` — environments, collections, assertions, mock panels; share-from-hash on load
+- `lib/clients/index.ts` — protocol dispatch, mock path, assertions on response
+- `lib/clients/http1.ts` — redirect following, connect/TTFB timing
+- `components/RequestEditor.tsx` — protocol, body type, multipart, GraphQL variables
+- `components/LearningLog.tsx` — assertions results, protocol notes
+- `components/ExportBar.tsx` — extended codegen buttons
+- README — Phase 1/2 features, storage keys, editor tabs, stack
+
+---
+
 ## [0.1.1] — 2026-08-25
 
 ### Added
@@ -22,13 +63,11 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/).
   - `duplicate_header_http1` — HTTP/1.x may send multiple lines; servers may combine or pick one
   - `duplicate_header_h2h3` — H2/H3 Send keeps the **last** value; message includes line numbers and winning value
 - Validation panel **Duplicate headers detected** callout (yellow banner) with short explanation
-- RFC/MDN doc links on duplicate-header issues ([RFC 9110 §5.3](https://www.rfc-editor.org/rfc/rfc9110#name-field-values), [RFC 9113 §8.3](https://www.rfc-editor.org/rfc/rfc9113#name-request-pseudo-header-field), MDN headers)
+- RFC/MDN doc links on duplicate-header issues
 - Presets: **Lab: Duplicate Accept (1.1)**, **(H2)**, **(H3)**
 
 #### Documentation
-- README: **Duplicate headers (client vs server)** section (client vs server behavior, mental model)
-- README: **Validation in this app** table including duplicate-header rules
-- README: updated learning path, features, and labs list
+- README: duplicate headers section, validation table, updated learning path
 
 ### Changed
 - `lib/validate/rules.ts` — duplicate detection after header line parsing
@@ -51,54 +90,18 @@ Initial educational release: compose, validate, encode, and send HTTP/1.0–1.1 
 - Presets/labs, glossary, RFC/MDN doc links, curl/fetch/raw export
 - Request history in `localStorage` with **Clear history**
 - SSRF defaults (private targets blocked), timeouts, response size cap
-- README with architecture, URL usage, protocol notes, and project structure
 
 #### HTTP/1.0 and HTTP/1.1
-- Text wire encode (request line + headers + CRLF + body) with hex view
-- Version validation (e.g. `Host` required on 1.1; chunked not valid on 1.0)
-- Live send via Node `http` / `https`
-- **Send anyway** + missing `Host`: Node `setHost: false` so Host is not auto-injected
-- **Actually sent** panel: reconstructed wire text/hex, headers, equivalent curl
+- Text wire encode; live send via Node `http` / `https`
+- **Send anyway** + missing `Host`: `setHost: false`
+- **Actually sent** panel
 
 #### HTTP/2
-- Live send via Node `http2` (HTTPS + ALPN `h2`)
-- Educational HEADERS/DATA frames + HPACK field encoding
-- Pseudo-headers (`:method`, `:scheme`, `:path`, `:authority`) from Method + URL
-- Validation forbids connection-specific headers (`Connection`, `Transfer-Encoding`, …)
-- Compare **1.1 vs 2** (text wire vs H2 frames)
+- Live send via Node `http2`; HPACK frames; Compare 1.1 vs 2
 
 #### HTTP/3
-- Live send preferring **`@currentspace/http3`** (QUIC + TLS 1.3), with **`curl --http3`** fallback
-- Alt-Svc probe (HTTPS HEAD) before/around send; surface Alt-Svc in lifecycle and **Actually sent**
-- Educational HTTP/3 frames + QPACK-style field encoding
-- Educational **QUIC / TLS 1.3 timeline** (UDP → handshake → SETTINGS → request stream)
-- Richer **Actually sent** for H3: protocol, transport, Alt-Svc, stream id, pseudo-headers, QUIC notes, curl
-- `/api/http3-support` reports `currentspace` and `curlHttp3` availability
-- `serverExternalPackages: ["@currentspace/http3"]` for native/WASM runtime loading
-- Labs: Cloudflare H3 targets, `:authority` from URL, Connection forbidden on H3
-- Compare **1.1 vs 3** and **2 vs 3**; **HPACK vs QPACK** lesson panel
-
-#### Teaching UX
-- Expanded in-UI callout for HTTP/2 and HTTP/3: request line vs pseudo-headers, mapping from UI fields, forbidden headers, HPACK vs QPACK / QUIC notes, RFC/MDN links
-- Consistent secondary button styling (Validate no longer looks permanently “focused”); Send remains primary
-- Version docs panel keyed to selected HTTP version
-
-### Implementation map
-
-| Area | Location |
-|------|----------|
-| UI shell | `app/page.tsx`, `components/*` |
-| Validate / encode / send APIs | `app/api/*/route.ts` |
-| Parsing & safety | `lib/parse.ts`, `lib/safety.ts` |
-| Validation rules | `lib/validate/rules.ts` |
-| HTTP/1.x encode & send | `lib/encode/http1.ts`, `lib/clients/http1.ts` |
-| HTTP/2 encode & send | `lib/encode/http2-frames.ts`, `lib/clients/http2.ts` |
-| HTTP/3 encode & send | `lib/encode/http3-frames.ts`, `lib/clients/http3.ts`, `lib/clients/alt-svc.ts` |
-| Actually sent reconstruction | `lib/clients/sent.ts` |
-| QUIC timeline copy | `lib/learn/quic-timeline.ts` |
-| Docs / presets / history | `lib/learn/*` |
+- `@currentspace/http3` + curl fallback; QPACK frames; QUIC timeline; Compare 1.1/2 vs 3
 
 ### Dependencies (notable)
-- `next`, `react`, `react-dom`
-- `@currentspace/http3` — live HTTP/3 client
-- Optional system dependency: `curl` built with HTTP3 (fallback only)
+- `next`, `react`, `react-dom`, `@currentspace/http3`
+- Optional: system `curl` with HTTP3

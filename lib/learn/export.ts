@@ -71,6 +71,76 @@ export function toFetch(req: ComposedRequest): string {
   )});`;
 }
 
+export function toAxios(req: ComposedRequest): string {
+  const parsed = parseComposedRequest(req);
+  const headers: Record<string, string> = {};
+  for (const h of parsed.headers) {
+    if (!h.name) continue;
+    headers[h.name] = h.value;
+  }
+  const config: Record<string, unknown> = {
+    method: parsed.method.toLowerCase(),
+    url: parsed.url,
+    headers,
+  };
+  if (parsed.body && parsed.method !== "GET" && parsed.method !== "HEAD") {
+    config.data = parsed.body;
+  }
+  return `import axios from "axios";\n\nconst response = await axios(${JSON.stringify(config, null, 2)});\nconsole.log(response.status, response.data);`;
+}
+
+export function toPythonRequests(req: ComposedRequest): string {
+  const parsed = parseComposedRequest(req);
+  const headers: Record<string, string> = {};
+  for (const h of parsed.headers) {
+    if (!h.name) continue;
+    headers[h.name] = h.value;
+  }
+  const lines = [
+    "import requests",
+    "",
+    `response = requests.request(`,
+    `    ${JSON.stringify(parsed.method)},`,
+    `    ${JSON.stringify(parsed.url)},`,
+    `    headers=${JSON.stringify(headers, null, 4).replace(/\n/g, "\n    ")},`,
+  ];
+  if (parsed.body && parsed.method !== "GET" && parsed.method !== "HEAD") {
+    lines.push(`    data=${JSON.stringify(parsed.body)},`);
+  }
+  lines.push(")", "print(response.status_code)", "print(response.text)");
+  return lines.join("\n");
+}
+
+export function toGoHttp(req: ComposedRequest): string {
+  const parsed = parseComposedRequest(req);
+  const bodyArg =
+    parsed.body && parsed.method !== "GET" && parsed.method !== "HEAD"
+      ? `strings.NewReader(${JSON.stringify(parsed.body)})`
+      : "nil";
+  return `package main
+
+import (
+  "fmt"
+  "io"
+  "net/http"
+  "strings"
+)
+
+func main() {
+  req, _ := http.NewRequest(${JSON.stringify(parsed.method)}, ${JSON.stringify(parsed.url)}, ${bodyArg})
+${parsed.headers
+  .filter((h) => h.name)
+  .map((h) => `  req.Header.Set(${JSON.stringify(h.name)}, ${JSON.stringify(h.value)})`)
+  .join("\n")}
+  resp, err := http.DefaultClient.Do(req)
+  if err != nil { panic(err) }
+  defer resp.Body.Close()
+  b, _ := io.ReadAll(resp.Body)
+  fmt.Println(resp.Status)
+  fmt.Println(string(b))
+}`;
+}
+
 function shellQuote(s: string): string {
   if (/^[A-Za-z0-9_./:=@-]+$/.test(s)) return s;
   return `'${s.replace(/'/g, `'\\''`)}'`;

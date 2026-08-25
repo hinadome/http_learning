@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
 import { executeRequest } from "@/lib/clients";
-import type { ComposedRequest } from "@/lib/types";
+import type { ComposedRequest, MockRule } from "@/lib/types";
 
 export const runtime = "nodejs";
 
+interface SendBody extends ComposedRequest {
+  mockRules?: MockRule[];
+}
+
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as ComposedRequest;
-    const log = await executeRequest(body);
+    const body = (await request.json()) as SendBody;
+    const { mockRules, ...req } = body;
+    const log = await executeRequest(req, { mockRules });
     return NextResponse.json(log);
   } catch (e) {
     return NextResponse.json(

@@ -30,6 +30,8 @@ npm start
 | Learn the wire | Encode text (1.x) or educational binary frames (2 / 3) |
 | Learn the flow | Lifecycle log: compose → validate → encode → connect → write → read |
 | Verify against specs | Links to RFCs and MDN on issues, methods, status codes, glossary |
+| Build & reuse requests | Collections, environments (`{{var}}`), share URL, OpenAPI import |
+| Test without the network | Mock rules; post-response assertions |
 
 This is an **educational client**, not a production API tester.
 
@@ -43,6 +45,8 @@ Browser UI  --POST JSON-->  Next.js API routes
                                |-- /api/encode     (no outbound network)
                                |-- /api/send       --> target server (httpbin, etc.)
                                |-- /api/http3-support
+                               |-- /api/ws         (WebSocket relay)
+                               |-- /api/mqtt       (MQTT publish bridge)
 ```
 
 ```mermaid
@@ -403,23 +407,74 @@ http_checker/
       docs.ts
       export.ts
       history.ts
+      collections.ts
+      environments.ts
+      assertions.ts
+      mock.ts
+      openapi.ts
+      share.ts
+      cookies.ts
       quic-timeline.ts
+    env/
+      substitute.ts
+    import/
+      raw-http.ts
+      curl.ts
+      auth.ts
+    request/
+      prepare.ts
+  ROADMAP.md
 ```
+
+## Request editor tabs
+
+| Tab | Purpose |
+|-----|---------|
+| **Request** | Version, protocol, method, URL, headers, body type, options |
+| **Params** | Query parameters (toggle without losing in-progress keys) |
+| **Auth** | Basic, Bearer, API key → headers or query |
+| **Import** | Raw HTTP, curl, OpenAPI 3 JSON |
 
 ## Features (UI)
 
-- Line-by-line header editor + body  
+### HTTP learning (core)
+- Line-by-line header editor + body (text, JSON, GraphQL, multipart)  
 - HTTP version selector (1.0 / 1.1 / 2 / 3)  
+- **Protocol** selector: HTTP, GraphQL, WebSocket, SSE, gRPC (gateway), MQTT (bridge)  
 - Expanded **pseudo-header vs request-line** explanation for HTTP/2 and HTTP/3  
 - Validate, Encode, Compare (1.1/2/3 pairs), Send  
 - **Duplicate header warnings** with version-specific messages and panel callout  
 - Lifecycle, Wire/Binary (including **Actually sent** + QUIC timeline), Response tabs  
+- Response teaching: status codes, 3xx + Location, Set-Cookie panel, timing breakdown  
+- Redirect chain when **Follow redirects** is enabled (HTTP/1.x)  
 - Pseudo-headers, HPACK/QPACK field notes, frame annotations  
-- HPACK vs QPACK lesson panel  
-- Presets / labs (Missing Host, duplicate Accept, H2/H3 Connection, H3 Cloudflare, authority-from-URL, …)  
+- HPACK vs QPACK lesson + **Multiplex lesson** (H1 vs H2 vs H3)  
+- Presets / labs (Missing Host, duplicate Accept, redirects, Set-Cookie, H2/H3 Connection, …)  
 - Glossary + version docs panel (RFC/MDN)  
-- Export: curl, fetch, raw HTTP/1.x  
 - History in `localStorage` with **Clear history**  
+
+### Import & export
+- **Import:** raw HTTP/1.x, curl, OpenAPI 3 JSON → collections  
+- **Export:** curl, fetch, raw HTTP/1.x, Python `requests`, axios, Go  
+- **Share URL** — encode request in `#share=…` (no account)  
+
+### API-client style (local-only)
+- **Collections / folders** — save and reload requests  
+- **Environments** — `{{variable}}` substitution before Validate/Send  
+- **Assertions** — post-response checks (status, header contains, body contains)  
+- **Mock server** — match rules on Send without network  
+- **CI export** — Postman collection JSON + bash curl script from collections  
+
+## Browser storage (`localStorage`)
+
+| Key | Contents |
+|-----|----------|
+| `http-learning-checker-history` | Last 30 Send summaries |
+| `http-learning-checker-collections` | Saved requests |
+| `http-learning-checker-folders` | Collection folder names |
+| `http-learning-checker-environments` | Environment variable sets |
+| `http-learning-checker-active-env` | Selected environment id |
+| `http-learning-checker-mocks` | Mock response rules |
 
 ## History storage
 
@@ -445,7 +500,11 @@ http_checker/
 4. Load **Lab: Duplicate Accept (H2)** → Validate → note warning and “last wins” on Send → check **Actually sent**.  
 5. Load **HTTP/3 GET (Cloudflare)** → Send → inspect Alt-Svc, transport, QUIC timeline, Actually sent pseudo-headers.  
 6. Load **Lesson: HPACK vs QPACK** → **Compare 2 vs 3**.  
-7. Follow RFC/MDN links on validation issues and in the H2/H3 callout.
+7. **Import** tab → paste curl or raw HTTP → Apply.  
+8. **Environments** → `{{baseUrl}}/get` → Send.  
+9. **Lab: Redirect (302)** → with/without Follow redirects.  
+10. **Mock** panel → rule + Use mock → Send (no network).  
+11. See [ROADMAP.md](./ROADMAP.md) Phase 1 & 2 review checklists.
 
 ## Stack
 
@@ -453,7 +512,13 @@ http_checker/
 - Tailwind CSS  
 - Node built-ins: `http`, `https`, `http2`  
 - `@currentspace/http3` for live HTTP/3 (QUIC)  
+- `ws` — WebSocket relay  
+- `mqtt` — MQTT publish bridge (educational)  
 - Optional fallback: system `curl` with HTTP3 support  
+
+## Roadmap
+
+See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1** and **Phase 2** are complete; Phase 3–4 track intercept tools and deeper protocol labs.
 
 ## License
 

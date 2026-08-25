@@ -1,225 +1,409 @@
 "use client";
 
-import type { ComposedRequest, HttpVersion } from "@/lib/types";
+import { useState } from "react";
+import type { ComposedRequest, HttpVersion, RequestProtocol, BodyType } from "@/lib/types";
+import { newMultipartFieldId } from "@/lib/request/prepare";
 import { METHOD_INFO } from "@/lib/learn/glossary";
 import { docsForMethod } from "@/lib/learn/docs";
 import { DocLinks } from "./DocLinks";
+import { QueryParamsEditor } from "./QueryParamsEditor";
+import { AuthEditor } from "./AuthEditor";
+import { ImportPanel } from "./ImportPanel";
 
 const VERSIONS: HttpVersion[] = ["1.0", "1.1", "2", "3"];
 const METHODS = Object.keys(METHOD_INFO);
 
+type EditorTab = "main" | "params" | "auth" | "import";
+
 interface Props {
   value: ComposedRequest;
   onChange: (next: ComposedRequest) => void;
+  onImportCollection?: (entries: import("@/lib/types").CollectionEntry[]) => void;
 }
 
-export function RequestEditor({ value, onChange }: Props) {
+export function RequestEditor({ value, onChange, onImportCollection }: Props) {
+  const [tab, setTab] = useState<EditorTab>("main");
   const methodInfo = METHOD_INFO[value.method];
   const methodDoc = docsForMethod(value.method);
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-[var(--muted)]">HTTP version</span>
-          <select
-            className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2"
-            value={value.version}
-            onChange={(e) =>
-              onChange({ ...value, version: e.target.value as HttpVersion })
-            }
+      <div className="flex flex-wrap gap-1 border-b border-[var(--border)] pb-2">
+        {(
+          [
+            ["main", "Request"],
+            ["params", "Params"],
+            ["auth", "Auth"],
+            ["import", "Import"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={`rounded px-3 py-1 text-xs ${
+              tab === id
+                ? "bg-[var(--accent)] text-white"
+                : "bg-[var(--panel)] text-[var(--fg)]"
+            }`}
           >
-            {VERSIONS.map((v) => (
-              <option key={v} value={v}>
-                HTTP/{v}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-[var(--muted)]">Method</span>
-          <select
-            className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 font-mono"
-            value={value.method}
-            onChange={(e) => onChange({ ...value, method: e.target.value })}
-          >
-            {METHODS.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex min-w-[16rem] flex-1 flex-col gap-1 text-sm">
-          <span className="font-medium text-[var(--muted)]">URL</span>
-          <input
-            className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 font-mono text-sm"
-            value={value.url}
-            onChange={(e) => onChange({ ...value, url: e.target.value })}
-            placeholder="https://httpbin.org/get"
-            spellCheck={false}
-          />
-        </label>
+            {label}
+          </button>
+        ))}
       </div>
 
-      {methodInfo && (
-        <div className="text-sm text-[var(--muted)]">
-          <p>
-            <strong className="text-[var(--fg)]">{value.method}</strong> —{" "}
-            {methodInfo.summary} Safe: {methodInfo.safe ? "yes" : "no"};
-            idempotent: {methodInfo.idempotent ? "yes" : "no"}.
-          </p>
-          {methodDoc && <DocLinks docs={[methodDoc]} />}
-        </div>
+      {tab === "params" && (
+        <QueryParamsEditor
+          url={value.url}
+          onUrlChange={(url) => onChange({ ...value, url })}
+        />
       )}
 
-      {(value.version === "2" || value.version === "3") && (
-        <div className="rounded border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-3 text-sm leading-relaxed">
-          <p className="font-medium text-[var(--fg)]">
-            How HTTP/{value.version} differs from HTTP/1.x on the wire
-          </p>
-          <p className="mt-2 text-[var(--muted)]">
-            In HTTP/1.0 and 1.1, the first line of the message is readable text,
-            for example:
-          </p>
-          <pre className="mt-1 overflow-x-auto rounded bg-[var(--code)] p-2 font-mono text-xs">
-            {`GET /get?x=1 HTTP/1.1\r\nHost: example.com\r\nAccept: application/json\r\n\r\n`}
-          </pre>
-          <p className="mt-2 text-[var(--muted)]">
-            HTTP/{value.version} does <strong className="text-[var(--fg)]">not</strong>{" "}
-            send that text request line. Method, URL pieces, and scheme become{" "}
-            <strong className="text-[var(--fg)]">pseudo-headers</strong> (names
-            starting with <code>:</code>) inside a compressed header block:
-          </p>
-          <ul className="mt-2 list-inside list-disc text-[var(--muted)]">
-            <li>
-              <code>:method</code> — from the Method dropdown (e.g.{" "}
-              <code>GET</code>)
-            </li>
-            <li>
-              <code>:scheme</code> — from the URL (
-              <code>https</code> or <code>http</code>)
-            </li>
-            <li>
-              <code>:path</code> — path + query only (e.g.{" "}
-              <code>/get?x=1</code>), not the full URL
-            </li>
-            <li>
-              <code>:authority</code> — host[:port] from the URL (replaces the
-              role of the <code>Host</code> header)
-            </li>
-          </ul>
-          <p className="mt-2 text-[var(--muted)]">
-            The lines you type below (<code>Accept:</code>,{" "}
-            <code>User-Agent:</code>, …) become the{" "}
-            <strong className="text-[var(--fg)]">regular header fields</strong>{" "}
-            after those pseudo-headers. Do not put{" "}
-            <code>Connection</code>, <code>Transfer-Encoding</code>, or{" "}
-            <code>Host</code> here for HTTP/{value.version} — they are forbidden
-            or mapped differently (this app sets <code>:authority</code> from the
-            URL).
-          </p>
-          <p className="mt-2 text-[var(--muted)]">
-            {value.version === "2" ? (
-              <>
-                On HTTP/2 those fields are packed into binary{" "}
-                <strong className="text-[var(--fg)]">HEADERS frames</strong> and
-                compressed with <strong className="text-[var(--fg)]">HPACK</strong>{" "}
-                over TLS/TCP. Use <strong>Encode</strong> or{" "}
-                <strong>Compare 1.1 vs 2</strong> to see frames and hex.
-              </>
-            ) : (
-              <>
-                On HTTP/3 the same logical fields ride in{" "}
-                <strong className="text-[var(--fg)]">HTTP/3 HEADERS</strong>{" "}
-                frames, compressed with{" "}
-                <strong className="text-[var(--fg)]">QPACK</strong>, over{" "}
-                <strong className="text-[var(--fg)]">QUIC/UDP</strong> (TLS 1.3
-                is inside the QUIC handshake). Use <strong>Encode</strong> or{" "}
-                <strong>Compare 2 vs 3</strong> for QPACK vs HPACK.
-              </>
+      {tab === "auth" && <AuthEditor value={value} onChange={onChange} />}
+
+      {tab === "import" && (
+        <ImportPanel
+          currentUrl={value.url}
+          onImportCollection={onImportCollection}
+          onApply={(req) =>
+            onChange({
+              ...req,
+              sendAnyway: value.sendAnyway,
+              allowPrivateTargets: value.allowPrivateTargets,
+              followRedirects: value.followRedirects,
+              maxRedirects: value.maxRedirects,
+              protocol: req.protocol ?? value.protocol,
+              bodyType: req.bodyType ?? value.bodyType,
+            })
+          }
+        />
+      )}
+
+      {tab === "main" && (
+        <>
+          <div className="flex flex-wrap gap-3">
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-[var(--muted)]">HTTP version</span>
+              <select
+                className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2"
+                value={value.version}
+                onChange={(e) =>
+                  onChange({ ...value, version: e.target.value as HttpVersion })
+                }
+              >
+                {VERSIONS.map((v) => (
+                  <option key={v} value={v}>
+                    HTTP/{v}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-[var(--muted)]">Method</span>
+              <select
+                className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 font-mono"
+                value={value.method}
+                onChange={(e) => onChange({ ...value, method: e.target.value })}
+              >
+                {METHODS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex min-w-[16rem] flex-1 flex-col gap-1 text-sm">
+              <span className="font-medium text-[var(--muted)]">URL</span>
+              <input
+                className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 font-mono text-sm"
+                value={value.url}
+                onChange={(e) => onChange({ ...value, url: e.target.value })}
+                placeholder="https://httpbin.org/get"
+                spellCheck={false}
+              />
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-[var(--muted)]">Protocol</span>
+              <select
+                className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm"
+                value={value.protocol ?? "http"}
+                onChange={(e) =>
+                  onChange({
+                    ...value,
+                    protocol: e.target.value as RequestProtocol,
+                  })
+                }
+              >
+                <option value="http">HTTP / REST</option>
+                <option value="graphql">GraphQL</option>
+                <option value="websocket">WebSocket</option>
+                <option value="sse">SSE</option>
+                <option value="grpc">gRPC (gateway)</option>
+                <option value="mqtt">MQTT (bridge)</option>
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-[var(--muted)]">Body type</span>
+              <select
+                className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm"
+                value={value.bodyType ?? "text"}
+                onChange={(e) =>
+                  onChange({
+                    ...value,
+                    bodyType: e.target.value as BodyType,
+                  })
+                }
+              >
+                <option value="none">None</option>
+                <option value="text">Text</option>
+                <option value="json">JSON</option>
+                <option value="graphql">GraphQL query</option>
+                <option value="multipart">Multipart form</option>
+              </select>
+            </label>
+          </div>
+
+          {(value.protocol === "websocket" || value.protocol === "mqtt") && (
+            <p className="rounded border border-[var(--border)] px-3 py-2 text-xs text-[var(--muted)]">
+              {value.protocol === "websocket"
+                ? "URL should be ws: or wss: (e.g. wss://echo.websocket.org). Optional outbound message below."
+                : "URL = MQTT broker (e.g. mqtt://test.mosquitto.org:1883). Set topic below; body = payload."}
+            </p>
+          )}
+
+          {value.protocol === "mqtt" && (
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-[var(--muted)]">MQTT topic</span>
+              <input
+                className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 font-mono text-sm"
+                value={value.mqttTopic ?? ""}
+                onChange={(e) =>
+                  onChange({ ...value, mqttTopic: e.target.value })
+                }
+                placeholder="test/topic"
+              />
+            </label>
+          )}
+
+          {value.protocol === "websocket" && (
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-[var(--muted)]">
+                WebSocket outbound message
+              </span>
+              <input
+                className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 font-mono text-sm"
+                value={value.wsOutboundMessage ?? ""}
+                onChange={(e) =>
+                  onChange({ ...value, wsOutboundMessage: e.target.value })
+                }
+                placeholder="Hello"
+              />
+            </label>
+          )}
+
+          {methodInfo && (
+            <div className="text-sm text-[var(--muted)]">
+              <p>
+                <strong className="text-[var(--fg)]">{value.method}</strong> —{" "}
+                {methodInfo.summary} Safe: {methodInfo.safe ? "yes" : "no"};
+                idempotent: {methodInfo.idempotent ? "yes" : "no"}.
+              </p>
+              {methodDoc && <DocLinks docs={[methodDoc]} />}
+            </div>
+          )}
+
+          {(value.version === "2" || value.version === "3") && (
+            <div className="rounded border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-3 text-sm leading-relaxed">
+              <p className="font-medium text-[var(--fg)]">
+                How HTTP/{value.version} differs from HTTP/1.x on the wire
+              </p>
+              <p className="mt-2 text-[var(--muted)]">
+                HTTP/{value.version} uses pseudo-headers (
+                <code>:method</code>, <code>:scheme</code>, <code>:path</code>,{" "}
+                <code>:authority</code>) instead of a text request line. See Encode
+                or Compare tabs for frames.
+              </p>
+              <DocLinks
+                docs={
+                  value.version === "2"
+                    ? [
+                        {
+                          label: "RFC 9113 — HTTP/2 pseudo-headers",
+                          url: "https://www.rfc-editor.org/rfc/rfc9113#name-request-pseudo-header-fields",
+                          source: "RFC",
+                        },
+                      ]
+                    : [
+                        {
+                          label: "RFC 9114 — HTTP/3",
+                          url: "https://www.rfc-editor.org/rfc/rfc9114",
+                          source: "RFC",
+                        },
+                      ]
+                }
+              />
+            </div>
+          )}
+
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-[var(--muted)]">
+              Headers (one per line: Name: value)
+            </span>
+            <textarea
+              className="min-h-[180px] rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 font-mono text-sm leading-relaxed"
+              value={value.headerText}
+              onChange={(e) =>
+                onChange({ ...value, headerText: e.target.value })
+              }
+              spellCheck={false}
+              placeholder={"Host: example.com\nAccept: application/json"}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-[var(--muted)]">
+              {(value.bodyType ?? "text") === "graphql" || value.protocol === "graphql"
+                ? "GraphQL query"
+                : "Body"}
+            </span>
+            <textarea
+              className="min-h-[100px] rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 font-mono text-sm"
+              value={value.body}
+              onChange={(e) => onChange({ ...value, body: e.target.value })}
+              spellCheck={false}
+              placeholder={
+                value.protocol === "graphql"
+                  ? "{ users { id name } }"
+                  : "Optional request body"
+              }
+            />
+          </label>
+
+          {(value.bodyType === "graphql" || value.protocol === "graphql") && (
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-[var(--muted)]">
+                GraphQL variables (JSON)
+              </span>
+              <textarea
+                className="min-h-[60px] rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 font-mono text-xs"
+                value={value.graphqlVariables ?? "{}"}
+                onChange={(e) =>
+                  onChange({ ...value, graphqlVariables: e.target.value })
+                }
+                spellCheck={false}
+              />
+            </label>
+          )}
+
+          {value.bodyType === "multipart" && (
+            <div className="flex flex-col gap-2 text-sm">
+              <span className="font-medium text-[var(--muted)]">Form fields</span>
+              {(value.multipartFields ?? []).map((f) => (
+                <div key={f.id} className="flex gap-2">
+                  <input
+                    type="checkbox"
+                    checked={f.enabled}
+                    onChange={(e) =>
+                      onChange({
+                        ...value,
+                        multipartFields: (value.multipartFields ?? []).map((x) =>
+                          x.id === f.id ? { ...x, enabled: e.target.checked } : x
+                        ),
+                      })
+                    }
+                  />
+                  <input
+                    className="w-28 rounded border border-[var(--border)] px-2 py-1 font-mono text-xs"
+                    value={f.name}
+                    placeholder="name"
+                    onChange={(e) =>
+                      onChange({
+                        ...value,
+                        multipartFields: (value.multipartFields ?? []).map((x) =>
+                          x.id === f.id ? { ...x, name: e.target.value } : x
+                        ),
+                      })
+                    }
+                  />
+                  <input
+                    className="min-w-0 flex-1 rounded border border-[var(--border)] px-2 py-1 font-mono text-xs"
+                    value={f.value}
+                    placeholder="value"
+                    onChange={(e) =>
+                      onChange({
+                        ...value,
+                        multipartFields: (value.multipartFields ?? []).map((x) =>
+                          x.id === f.id ? { ...x, value: e.target.value } : x
+                        ),
+                      })
+                    }
+                  />
+                </div>
+              ))}
+              <button
+                type="button"
+                className="self-start text-xs text-[var(--accent)]"
+                onClick={() =>
+                  onChange({
+                    ...value,
+                    multipartFields: [
+                      ...(value.multipartFields ?? []),
+                      {
+                        id: newMultipartFieldId(),
+                        name: "",
+                        value: "",
+                        enabled: true,
+                      },
+                    ],
+                  })
+                }
+              >
+                + Field
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={Boolean(value.sendAnyway)}
+                onChange={(e) =>
+                  onChange({ ...value, sendAnyway: e.target.checked })
+                }
+              />
+              Send anyway if validation has errors (for learning)
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={Boolean(value.allowPrivateTargets)}
+                onChange={(e) =>
+                  onChange({ ...value, allowPrivateTargets: e.target.checked })
+                }
+              />
+              Allow private / localhost targets (SSRF override)
+            </label>
+            {(value.version === "1.0" || value.version === "1.1") &&
+              (value.protocol ?? "http") === "http" && (
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={Boolean(value.followRedirects)}
+                  onChange={(e) =>
+                    onChange({ ...value, followRedirects: e.target.checked })
+                  }
+                />
+                Follow redirects (3xx Location) — shows redirect chain
+              </label>
             )}
-          </p>
-          <DocLinks
-            docs={
-              value.version === "2"
-                ? [
-                    {
-                      label: "RFC 9113 — HTTP/2 pseudo-headers",
-                      url: "https://www.rfc-editor.org/rfc/rfc9113#name-request-pseudo-header-fields",
-                      source: "RFC",
-                    },
-                    {
-                      label: "MDN: HTTP/2",
-                      url: "https://developer.mozilla.org/en-US/docs/Glossary/HTTP_2",
-                      source: "MDN",
-                    },
-                  ]
-                : [
-                    {
-                      label: "RFC 9114 — HTTP/3 HTTP control data",
-                      url: "https://www.rfc-editor.org/rfc/rfc9114#name-http-control-data",
-                      source: "RFC",
-                    },
-                    {
-                      label: "MDN: HTTP/3",
-                      url: "https://developer.mozilla.org/en-US/docs/Glossary/HTTP_3",
-                      source: "MDN",
-                    },
-                  ]
-            }
-          />
-        </div>
+          </div>
+        </>
       )}
-
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium text-[var(--muted)]">
-          Headers (one per line: Name: value)
-        </span>
-        <textarea
-          className="min-h-[180px] rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 font-mono text-sm leading-relaxed"
-          value={value.headerText}
-          onChange={(e) => onChange({ ...value, headerText: e.target.value })}
-          spellCheck={false}
-          placeholder={"Host: example.com\nAccept: application/json"}
-        />
-      </label>
-
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium text-[var(--muted)]">Body</span>
-        <textarea
-          className="min-h-[100px] rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 font-mono text-sm"
-          value={value.body}
-          onChange={(e) => onChange({ ...value, body: e.target.value })}
-          spellCheck={false}
-          placeholder="Optional request body"
-        />
-      </label>
-
-      <div className="flex flex-col gap-2 text-sm">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={Boolean(value.sendAnyway)}
-            onChange={(e) =>
-              onChange({ ...value, sendAnyway: e.target.checked })
-            }
-          />
-          Send anyway if validation has errors (for learning)
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={Boolean(value.allowPrivateTargets)}
-            onChange={(e) =>
-              onChange({ ...value, allowPrivateTargets: e.target.checked })
-            }
-          />
-          Allow private / localhost targets (SSRF override)
-        </label>
-      </div>
     </section>
   );
 }

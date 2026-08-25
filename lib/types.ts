@@ -1,5 +1,15 @@
 export type HttpVersion = "1.0" | "1.1" | "2" | "3";
 
+export type RequestProtocol =
+  | "http"
+  | "graphql"
+  | "websocket"
+  | "sse"
+  | "grpc"
+  | "mqtt";
+
+export type BodyType = "none" | "text" | "json" | "graphql" | "multipart";
+
 export type Severity = "error" | "warning" | "info";
 
 export interface DocRef {
@@ -29,6 +39,61 @@ export interface ParsedHeader {
   line: number;
 }
 
+export interface MultipartField {
+  id: string;
+  name: string;
+  value: string;
+  enabled: boolean;
+}
+
+export interface RequestAssertion {
+  id: string;
+  kind: "status" | "header" | "body_contains";
+  target?: string;
+  expected: string;
+}
+
+export interface AssertionResult {
+  id: string;
+  passed: boolean;
+  message: string;
+}
+
+export interface MockRule {
+  id: string;
+  name: string;
+  method?: string;
+  pathPattern: string;
+  status: number;
+  responseHeaders: string;
+  responseBody: string;
+}
+
+export interface EnvVariable {
+  id: string;
+  key: string;
+  value: string;
+  enabled: boolean;
+}
+
+export interface Environment {
+  id: string;
+  name: string;
+  variables: EnvVariable[];
+}
+
+export interface CollectionFolder {
+  id: string;
+  name: string;
+}
+
+export interface CollectionEntry {
+  id: string;
+  name: string;
+  folderId?: string;
+  request: ComposedRequest;
+}
+
 export interface ComposedRequest {
   version: HttpVersion;
   method: string;
@@ -38,6 +103,24 @@ export interface ComposedRequest {
   body: string;
   allowPrivateTargets?: boolean;
   sendAnyway?: boolean;
+  /** Follow 3xx Location hops (HTTP/1.x send only). Default false for teaching. */
+  followRedirects?: boolean;
+  maxRedirects?: number;
+  /** Multi-protocol mode (default http). */
+  protocol?: RequestProtocol;
+  bodyType?: BodyType;
+  /** GraphQL variables JSON object string. */
+  graphqlVariables?: string;
+  multipartFields?: MultipartField[];
+  /** Outbound WebSocket text frame. */
+  wsOutboundMessage?: string;
+  /** Post-response checks (no JS sandbox). */
+  assertions?: RequestAssertion[];
+  /** Route Send through mock matcher instead of network. */
+  useMock?: boolean;
+  mockRuleId?: string;
+  /** MQTT topic when protocol is mqtt. */
+  mqttTopic?: string;
 }
 
 export interface ParsedRequest {
@@ -101,6 +184,14 @@ export interface EncodeResult {
   quicTimeline?: LifecycleStep[];
 }
 
+export interface RedirectHop {
+  hop: number;
+  url: string;
+  status: number;
+  statusText: string;
+  location: string;
+}
+
 export interface SendResponse {
   status: number;
   statusText: string;
@@ -117,6 +208,9 @@ export interface LearningLog {
   validation: ValidationResult;
   encode: EncodeResult;
   response?: SendResponse;
+  /** 3xx hops when followRedirects is enabled (HTTP/1.x). */
+  redirectChain?: RedirectHop[];
+  finalUrl?: string;
   /** What was actually sent on the last Send (wire + curl). */
   sent?: {
     wireText?: string;
@@ -133,6 +227,8 @@ export interface LearningLog {
     quicNotes?: string[];
   };
   error?: string;
+  assertionResults?: AssertionResult[];
+  protocolNotes?: string[];
   timing: {
     totalMs: number;
     dnsMs?: number;

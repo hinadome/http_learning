@@ -2,7 +2,14 @@
 
 import { useMemo, useState } from "react";
 import type { ComposedRequest } from "@/lib/types";
-import { toCurl, toFetch, toRawHttp1 } from "@/lib/learn/export";
+import {
+  toAxios,
+  toCurl,
+  toFetch,
+  toGoHttp,
+  toPythonRequests,
+  toRawHttp1,
+} from "@/lib/learn/export";
 
 interface Props {
   request: ComposedRequest;
@@ -11,27 +18,18 @@ interface Props {
 export function ExportBar({ request }: Props) {
   const [copied, setCopied] = useState<string | null>(null);
 
-  const curl = useMemo(() => {
+  const codes = useMemo(() => {
     try {
-      return toCurl(request);
+      return {
+        curl: toCurl(request),
+        fetch: toFetch(request),
+        raw: toRawHttp1(request),
+        python: toPythonRequests(request),
+        axios: toAxios(request),
+        go: toGoHttp(request),
+      };
     } catch {
-      return "";
-    }
-  }, [request]);
-
-  const fetchCode = useMemo(() => {
-    try {
-      return toFetch(request);
-    } catch {
-      return "";
-    }
-  }, [request]);
-
-  const raw = useMemo(() => {
-    try {
-      return toRawHttp1(request);
-    } catch {
-      return "";
+      return null;
     }
   }, [request]);
 
@@ -41,32 +39,30 @@ export function ExportBar({ request }: Props) {
     setTimeout(() => setCopied(null), 1500);
   }
 
+  if (!codes) return null;
+
+  const buttons: Array<[string, string]> = [
+    ["curl", codes.curl],
+    ["fetch", codes.fetch],
+    ["python", codes.python],
+    ["axios", codes.axios],
+    ["go", codes.go],
+    ["raw", codes.raw],
+  ];
+
   return (
     <div className="flex flex-wrap gap-2">
-      <button
-        type="button"
-        className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-sm"
-        disabled={!curl}
-        onClick={() => copy("curl", curl)}
-      >
-        {copied === "curl" ? "Copied curl" : "Copy curl"}
-      </button>
-      <button
-        type="button"
-        className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-sm"
-        disabled={!fetchCode}
-        onClick={() => copy("fetch", fetchCode)}
-      >
-        {copied === "fetch" ? "Copied fetch" : "Copy fetch"}
-      </button>
-      <button
-        type="button"
-        className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-sm"
-        disabled={!raw}
-        onClick={() => copy("raw", raw || "")}
-      >
-        {copied === "raw" ? "Copied raw" : "Copy raw HTTP/1.x"}
-      </button>
+      {buttons.map(([label, text]) => (
+        <button
+          key={label}
+          type="button"
+          className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-sm"
+          disabled={!text}
+          onClick={() => copy(label, text)}
+        >
+          {copied === label ? `Copied ${label}` : `Copy ${label}`}
+        </button>
+      ))}
     </div>
   );
 }

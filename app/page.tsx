@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
+  CollectionEntry,
   ComposedRequest,
   CompareEncodeResult,
   ComparePair,
   EncodeResult,
+  Environment,
   LearningLog,
   ValidationResult,
   HistoryItem,
@@ -13,6 +15,17 @@ import type {
 import { PRESETS } from "@/lib/learn/presets";
 import { GLOSSARY } from "@/lib/learn/glossary";
 import { loadHistory, pushHistory, clearHistory } from "@/lib/learn/history";
+import {
+  getActiveEnvironment,
+  loadActiveEnvId,
+  loadEnvironments,
+  saveEnvironments,
+} from "@/lib/learn/environments";
+import { applyEnvironment, envToMap } from "@/lib/env/substitute";
+import { loadMockRules } from "@/lib/learn/mock";
+import { saveCollections, loadCollections } from "@/lib/learn/collections";
+import { parseShareFromHash } from "@/lib/learn/share";
+import { prepareRequestForSend } from "@/lib/request/prepare";
 import { RequestEditor } from "@/components/RequestEditor";
 import { ValidationPanel } from "@/components/ValidationPanel";
 import { LearningLogView } from "@/components/LearningLog";
@@ -20,6 +33,12 @@ import { ExportBar } from "@/components/ExportBar";
 import { DocsPanel } from "@/components/DocsPanel";
 import { DocLinks } from "@/components/DocLinks";
 import { CompressionLesson } from "@/components/CompressionLesson";
+import { MultiplexLesson } from "@/components/MultiplexLesson";
+import { EnvironmentsPanel } from "@/components/EnvironmentsPanel";
+import { CollectionsPanel } from "@/components/CollectionsPanel";
+import { AssertionsPanel } from "@/components/AssertionsPanel";
+import { MockPanel } from "@/components/MockPanel";
+import { ShareButton } from "@/components/ShareButton";
 
 const DEFAULT: ComposedRequest = {
   version: "1.1",
@@ -31,6 +50,13 @@ User-Agent: HTTP-Learning-Checker/1.0`,
   body: "",
   sendAnyway: false,
   allowPrivateTargets: false,
+  followRedirects: false,
+  maxRedirects: 5,
+  protocol: "http",
+  bodyType: "text",
+  graphqlVariables: "{}",
+  multipartFields: [],
+  assertions: [],
 };
 
 export default function HomePage() {
@@ -41,27 +67,49 @@ export default function HomePage() {
   const [tab, setTab] = useState<"lifecycle" | "wire" | "response">("lifecycle");
   const [busy, setBusy] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [environments, setEnvironments] = useState<Environment[]>([]);
+  const [activeEnvId, setActiveEnvId] = useState("default");
   const [http3Support, setHttp3Support] = useState<{
     curlHttp3: boolean;
     currentspace: boolean;
   } | null>(null);
 
+  const resolvedRequest = useMemo(() => {
+    const active = getActiveEnvironment(environments);
+    const vars = envToMap(active.variables);
+    return applyEnvironment(request, vars);
+  }, [request, environments, activeEnvId]);
+
+  const loadRequest = useCallback((req: ComposedRequest) => {
+    const { request: prepared } = prepareRequestForSend(req);
+    return prepared;
+  }, []);
+
   useEffect(() => {
     setHistory(loadHistory());
+    setEnvironments(loadEnvironments());
+    setActiveEnvId(loadActiveEnvId());
     fetch("/api/http3-support")
       .then((r) => r.json())
       .then(setHttp3Support)
       .catch(() => setHttp3Support({ curlHttp3: false, currentspace: false }));
+
+    const shared = parseShareFromHash(window.location.hash);
+    if (shared) {
+      setRequest(shared);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
   }, []);
 
   async function validate() {
     setBusy("validate");
     setCompare(null);
+    const payload = loadRequest(resolvedRequest);
     try {
       const res = await fetch("/api/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
+        body: JSON.stringify(payload),
       });
       const data = (await res.json()) as ValidationResult;
       setValidation(data);
@@ -69,9 +117,9 @@ export default function HomePage() {
         steps: [
           {
             id: "compose",
-            label: "Compose request from UI input",
+            label: "Compose request (with environment)",
             status: "ok",
-            detail: `${request.method} ${request.url}`,
+            detail: `${payload.method} ${payload.url}`,
           },
           {
             id: "validate",
@@ -81,7 +129,7 @@ export default function HomePage() {
           },
         ],
         validation: data,
-        encode: { version: request.version, frames: [], notes: [] },
+        encode: { version: payload.version, frames: [], notes: [] },
         timing: { totalMs: 0 },
       });
       setTab("lifecycle");
@@ -92,12 +140,13 @@ export default function HomePage() {
 
   async function encode(comparePair?: ComparePair) {
     setBusy(comparePair ? `compare-${comparePair}` : "encode");
+    const payload = loadRequest(resolvedRequest);
     try {
       const res = await fetch("/api/encode", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...request,
+          ...payload,
           compare: Boolean(comparePair),
           comparePair,
         }),
@@ -125,7 +174,7 @@ export default function HomePage() {
           steps: [
             {
               id: "compose",
-              label: "Compose request from UI input",
+              label: "Compose request (with environment)",
               status: "ok",
             },
             {
@@ -149,11 +198,20 @@ export default function HomePage() {
   async function send() {
     setBusy("send");
     setCompare(null);
+    const payload = {
+      ...loadRequest(resolvedRequest),
+      assertions: request.assertions,
+      useMock: request.useMock,
+      mockRuleId: request.mockRuleId,
+    };
     try {
       const res = await fetch("/api/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
+        body: JSON.stringify({
+          ...payload,
+          mockRules: loadMockRules(),
+        }),
       });
       const data = (await res.json()) as LearningLog;
       setLog(data);
@@ -172,6 +230,12 @@ export default function HomePage() {
     }
   }
 
+  function mergeOpenApiImport(entries: CollectionEntry[]) {
+    const existing = loadCollections();
+    const merged = [...entries, ...existing].slice(0, 200);
+    saveCollections(merged);
+  }
+
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8">
       <header className="flex flex-col gap-2">
@@ -184,7 +248,8 @@ export default function HomePage() {
         <p className="max-w-2xl text-[var(--muted)]">
           Compose requests line by line, validate headers by HTTP version, send
           through a controlled proxy, and inspect text wire format or HTTP/2–3
-          binary frames — including HPACK/QPACK explainers.
+          binary frames — collections, environments, GraphQL, WebSocket, mocks,
+          and more.
         </p>
         <p className="rounded border border-[var(--warn)]/40 bg-[var(--warn-soft)] px-3 py-2 text-sm">
           Educational client only — not a production API tester. Private targets
@@ -223,7 +288,11 @@ export default function HomePage() {
 
       <div className="grid gap-8 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
-          <RequestEditor value={request} onChange={setRequest} />
+          <RequestEditor
+            value={request}
+            onChange={setRequest}
+            onImportCollection={mergeOpenApiImport}
+          />
 
           <div className="flex flex-wrap gap-2">
             <button
@@ -274,11 +343,35 @@ export default function HomePage() {
             >
               {busy === "send" ? "Sending…" : "Send"}
             </button>
+            <ShareButton request={request} />
           </div>
 
-          <ExportBar request={request} />
+          <ExportBar request={resolvedRequest} />
           <DocsPanel version={request.version} />
           <ValidationPanel result={validation} />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <EnvironmentsPanel
+              environments={environments}
+              onChange={(envs) => {
+                setEnvironments(envs);
+                saveEnvironments(envs);
+              }}
+              activeId={activeEnvId}
+              onActiveId={setActiveEnvId}
+            />
+            <CollectionsPanel
+              request={request}
+              onLoad={(req) => {
+                setRequest(req);
+                setValidation(null);
+                setLog(null);
+              }}
+            />
+          </div>
+
+          <AssertionsPanel value={request} onChange={setRequest} />
+          <MockPanel request={request} onChange={setRequest} />
 
           {history.length > 0 && (
             <div>
@@ -315,6 +408,7 @@ export default function HomePage() {
             compare={compare}
             tab={tab}
             onTab={setTab}
+            requestUrl={resolvedRequest.url}
           />
 
           <aside className="rounded border border-[var(--border)] bg-[var(--panel)] p-4">
@@ -333,6 +427,8 @@ export default function HomePage() {
           {(request.version === "2" ||
             request.version === "3" ||
             compare?.pair === "2-3") && <CompressionLesson />}
+
+          <MultiplexLesson />
         </div>
       </div>
     </main>

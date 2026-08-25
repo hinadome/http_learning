@@ -1,6 +1,6 @@
 import http from "node:http";
 import https from "node:https";
-import type { IncomingMessage } from "node:http";
+import type { IncomingMessage, ClientRequest } from "node:http";
 import { buildHttp1WireForSend } from "../encode/http1";
 import { parseComposedRequest } from "../parse";
 import {
@@ -11,12 +11,18 @@ import {
 import type {
   ComposedRequest,
   LifecycleStep,
+  RedirectHop,
   SendResponse,
 } from "../types";
 import {
+  buildRedirectHop,
+  isRedirectStatus,
+  methodAfterRedirect,
+  resolveRedirectLocation,
+} from "./redirects";
+import {
   buildWireText,
   curlFromSent,
-  normalizeOutgoingHeaders,
   type SentOnWire,
   wireToHex,
 } from "./sent";
@@ -55,30 +61,36 @@ function collectBody(res: IncomingMessage): Promise<{
 function headersHas(req: ComposedRequest, name: string): boolean {
   return req.headerText
     .split(/\r?\n/)
-    .some((line) =>
-      line.toLowerCase().startsWith(name.toLowerCase() + ":")
-    );
+    .some((line) => line.toLowerCase().startsWith(name.toLowerCase() + ":"));
 }
 
-export async function sendHttp1(
+interface SingleSendResult {
+  response: SendResponse;
+  sent: SentOnWire;
+  ttfbMs: number;
+  connectMs: number;
+}
+
+async function sendHttp1Once(
   req: ComposedRequest,
-  steps: LifecycleStep[]
-): Promise<{ response: SendResponse; sent: SentOnWire }> {
-  const parsed = parseComposedRequest(req);
+  urlOverride?: string
+): Promise<SingleSendResult> {
+  const working = urlOverride
+    ? { ...req, url: urlOverride }
+    : req;
+  const parsed = parseComposedRequest(working);
   await assertSafeTarget(parsed.target, req.allowPrivateTargets);
 
-  const hasHost = headersHas(req, "Host");
-  // Omit Host only when learning with Send anyway + missing Host.
-  // Otherwise inject so demos succeed.
-  const omitHost = req.version === "1.1" && !hasHost && Boolean(req.sendAnyway);
+  const hasHost = headersHas(working, "Host");
+  const omitHost =
+    working.version === "1.1" && !hasHost && Boolean(working.sendAnyway);
   const injectHost = !omitHost && !hasHost;
 
-  const { headers } = buildHttp1WireForSend(req, {
+  const { headers } = buildHttp1WireForSend(working, {
     injectHost,
     injectContentLength: true,
   });
 
-  // If omitHost, strip any Host that slipped in
   if (omitHost) {
     for (const key of Object.keys(headers)) {
       if (key.toLowerCase() === "host") delete headers[key];
@@ -86,21 +98,14 @@ export async function sendHttp1(
   }
 
   const headerMap: Record<string, string> = { ...headers };
-
-  steps.push({
-    id: "dns",
-    label: "DNS resolution",
-    status: "ok",
-    detail: parsed.target.hostname,
-  });
-
   const isHttps = parsed.target.protocol === "https:";
   const lib = isHttps ? https : http;
   const started = Date.now();
-  let ttfb = 0;
+  let connectMs = 0;
+  let ttfbMs = 0;
 
   const response = await new Promise<SendResponse>((resolve, reject) => {
-    const request = lib.request(
+    const request: ClientRequest = lib.request(
       {
         protocol: parsed.target.protocol,
         hostname: parsed.target.hostname,
@@ -109,11 +114,10 @@ export async function sendHttp1(
         method: parsed.method,
         headers: headerMap,
         timeout: REQUEST_TIMEOUT_MS,
-        // Critical: Node defaults to auto-adding Host. Disable when omitting for learning.
         setHost: !omitHost,
       },
       async (res) => {
-        ttfb = Date.now() - started;
+        ttfbMs = Date.now() - started;
         try {
           const collected = await collectBody(res);
           const rh: Record<string, string | string[]> = {};
@@ -135,14 +139,11 @@ export async function sendHttp1(
       }
     );
 
-    // Capture headers Node will actually send (after setHost behavior)
-    const actualHeaders = normalizeOutgoingHeaders(
-      request.getHeaders() as Record<string, unknown>
-    );
-
-    // Stash on request for outer scope via closure assignment
-    (request as unknown as { __actualHeaders?: Record<string, string> }).__actualHeaders =
-      actualHeaders;
+    request.on("socket", (socket) => {
+      socket.on("connect", () => {
+        connectMs = Date.now() - started;
+      });
+    });
 
     request.on("timeout", () => {
       request.destroy(
@@ -151,32 +152,17 @@ export async function sendHttp1(
     });
     request.on("error", reject);
 
-    steps.push({
-      id: "connect",
-      label: isHttps ? "TCP + TLS connect" : "TCP connect",
-      status: "ok",
-      detail: `${parsed.target.hostname}:${parsed.target.port || (isHttps ? 443 : 80)}`,
-    });
-
     if (parsed.body) {
       request.write(parsed.body);
     }
     request.end();
-
-    steps.push({
-      id: "write",
-      label: omitHost
-        ? "Write HTTP/1.x request (Host omitted)"
-        : "Write HTTP/1.x request",
-      status: "ok",
-      detail: `${parsed.method} ${parsed.pathWithQuery}`,
-    });
   });
 
-  // Re-create actual headers the same way for the sent report
-  // (getHeaders was captured inside; rebuild from headerMap + setHost rule)
   const headersSent = { ...headerMap };
-  if (!omitHost && !Object.keys(headersSent).some((k) => k.toLowerCase() === "host")) {
+  if (
+    !omitHost &&
+    !Object.keys(headersSent).some((k) => k.toLowerCase() === "host")
+  ) {
     const host =
       parsed.target.port &&
       !(
@@ -226,17 +212,135 @@ export async function sendHttp1(
     transport: "node-http1",
   };
 
+  return { response, sent, ttfbMs, connectMs };
+}
+
+function getLocationHeader(
+  headers: Record<string, string | string[]>
+): string | undefined {
+  for (const [k, v] of Object.entries(headers)) {
+    if (k.toLowerCase() === "location") {
+      return Array.isArray(v) ? v[0] : v;
+    }
+  }
+  return undefined;
+}
+
+export async function sendHttp1(
+  req: ComposedRequest,
+  steps: LifecycleStep[]
+): Promise<{
+  response: SendResponse;
+  sent: SentOnWire;
+  redirectChain?: RedirectHop[];
+  finalUrl?: string;
+  timingExtra?: { connectMs?: number; ttfbMs?: number };
+}> {
+  const parsed = parseComposedRequest(req);
+  steps.push({
+    id: "dns",
+    label: "DNS resolution",
+    status: "ok",
+    detail: parsed.target.hostname,
+  });
+
+  const isHttps = parsed.target.protocol === "https:";
+  steps.push({
+    id: "connect",
+    label: isHttps ? "TCP + TLS connect" : "TCP connect",
+    status: "ok",
+    detail: `${parsed.target.hostname}:${parsed.target.port || (isHttps ? 443 : 80)}`,
+  });
+
+  const omitHost =
+    req.version === "1.1" && !headersHas(req, "Host") && Boolean(req.sendAnyway);
+
+  steps.push({
+    id: "write",
+    label: omitHost
+      ? "Write HTTP/1.x request (Host omitted)"
+      : "Write HTTP/1.x request",
+    status: "ok",
+    detail: `${req.method} ${parsed.pathWithQuery}`,
+  });
+
+  const maxRedirects = req.maxRedirects ?? 5;
+  const redirectChain: RedirectHop[] = [];
+  let currentUrl = req.url;
+  let currentMethod = req.method;
+  let currentBody = req.body;
+  let result = await sendHttp1Once({
+    ...req,
+    method: currentMethod,
+    body: currentBody,
+    url: currentUrl,
+  });
+
+  let hop = 0;
+  while (
+    req.followRedirects &&
+    isRedirectStatus(result.response.status) &&
+    hop < maxRedirects
+  ) {
+    const location = getLocationHeader(result.response.headers);
+    if (!location) break;
+
+    const nextUrl = resolveRedirectLocation(location, currentUrl);
+    hop += 1;
+    redirectChain.push(
+      buildRedirectHop(
+        hop,
+        currentUrl,
+        result.response.status,
+        result.response.statusText,
+        location
+      )
+    );
+
+    currentMethod = methodAfterRedirect(result.response.status, currentMethod);
+    if (currentMethod === "GET") currentBody = "";
+
+    steps.push({
+      id: `redirect-${hop}`,
+      label: `Follow redirect ${result.response.status} → ${location}`,
+      status: "ok",
+      detail: nextUrl,
+    });
+
+    currentUrl = nextUrl;
+    result = await sendHttp1Once(
+      {
+        ...req,
+        method: currentMethod,
+        body: currentBody,
+        url: currentUrl,
+      },
+      currentUrl
+    );
+  }
+
   steps.push({
     id: "read",
-    label: "Read response",
+    label: redirectChain.length
+      ? `Read final response (after ${redirectChain.length} redirect(s))`
+      : "Read response",
     status: "ok",
-    detail: `${response.status} ${response.statusText}${
-      omitHost && response.status === 200
+    detail: `${result.response.status} ${result.response.statusText}${
+      omitHost && result.response.status === 200
         ? " (unexpected 200 — some servers tolerate missing Host)"
         : ""
     }`,
-    durationMs: ttfb,
+    durationMs: result.ttfbMs,
   });
 
-  return { response, sent };
+  return {
+    response: result.response,
+    sent: result.sent,
+    redirectChain: redirectChain.length ? redirectChain : undefined,
+    finalUrl: redirectChain.length ? currentUrl : undefined,
+    timingExtra: {
+      connectMs: result.connectMs,
+      ttfbMs: result.ttfbMs,
+    },
+  };
 }
