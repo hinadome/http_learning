@@ -241,7 +241,7 @@ User-Agent: HTTP-Learning-Checker/1.0`,
     id: "set-cookie-response",
     title: "Lab: Set-Cookie response",
     description:
-      "httpbin /cookies/set — inspect Set-Cookie teaching panel on Response tab.",
+      "httpbin /cookies/set — Send without follow redirects to see 302 + Set-Cookie on Response. (Follow redirects shows empty cookies — Node has no cookie jar.)",
     request: base({
       version: "1.1",
       method: "GET",
@@ -249,6 +249,21 @@ User-Agent: HTTP-Learning-Checker/1.0`,
       headerText: `Host: httpbin.org
 Accept: application/json
 User-Agent: HTTP-Learning-Checker/1.0`,
+      followRedirects: false,
+    }),
+  },
+  {
+    id: "websocket-echo",
+    title: "WebSocket echo",
+    description:
+      "wss://echo.websocket.org — Send opens relay, optional outbound message echoed back.",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "wss://echo.websocket.org",
+      headerText: "",
+      protocol: "websocket",
+      wsOutboundMessage: "Hello",
     }),
   },
   {

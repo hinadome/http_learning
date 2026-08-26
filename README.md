@@ -34,6 +34,7 @@ npm start
 | Test without the network | Mock rules; post-response assertions |
 | Intercept-style debugging | Session traffic log, rewrite rules, mock breakpoints, HAR export |
 | Deeper protocol labs | Multiplex simulator, H2 trailers/push encode, TLS panel, curriculum, dark mode |
+| Multi-protocol Send | GraphQL, WebSocket relay, SSE, gRPC gateway, MQTT bridge + protocol explain panel |
 
 This is an **educational client**, not a production API tester.
 
@@ -464,12 +465,18 @@ http_checker/
 - **Collections / folders** — save and reload requests  
 - **Environments** — `{{variable}}` substitution before Validate/Send  
 - **Assertions** — post-response checks (status, header contains, body contains)  
+- **Protocol selector** — HTTP, GraphQL (auto body type), WebSocket, SSE, gRPC gateway, MQTT; explain panel on change  
 - **Mock server** — match rules on Send without network  
-- **Rewrite rules** — inject request headers / replace response body on live Send  
-- **Session traffic log** — intercept-style log of app Sends (current tab)  
+- **Rewrite rules** — inject request headers / replace response body on live Send (Validate uses same inject)  
+- **Session traffic log** — intercept-style log of app Sends; click row for detail  
 - **Mock breakpoints** — pause on mock match, edit response before display  
 - **MITM & capture guides** — teaching panels (no system CA / no live qvis)  
 - **CI export** — Postman collection JSON + bash curl script from collections  
+
+### Labs worth knowing
+- **Set-Cookie** — Send **without** Follow redirects to see `302` + `Set-Cookie`. Follow redirects → final `/cookies` body is often `{"cookies":{}}` because this Node proxy has no cookie jar.  
+- **WebSocket** — URL `wss://…` + Protocol WebSocket; headers in the editor are not sent by the relay (URL + outbound message only). Status **101** in the UI is a teaching wrapper; the body is live frames from the server.  
+- **GraphQL** — selecting Protocol GraphQL sets Body type to GraphQL query and Method POST.  
 
 ## Browser storage (`localStorage`)
 
@@ -519,9 +526,10 @@ http_checker/
 10. **Mock** panel → rule + Use mock → Send (no network).  
 11. **Rewrite** → inject header or body replace → Send → lifecycle rewrite note.  
 12. **Breakpoint** → mock rule with Breakpoint → edit response in modal.  
-13. **Session traffic** + **Copy HAR** after Send.  
-14. See [ROADMAP.md](./ROADMAP.md) Phase 1–3 review checklists.
-15. **Phase 4** — dark mode, multiplex simulator, chunked/H2 encode labs, TLS panel, curriculum paths.
+13. **Session traffic** + **Copy HAR** after Send (click a traffic row for detail).  
+14. **WebSocket echo** preset → Send → Response shows live frames (101 is a UI wrapper).  
+15. **Lab: Set-Cookie** → Follow redirects **off** → see `Set-Cookie` on 302.  
+16. See [ROADMAP.md](./ROADMAP.md) Phase 1–4 review checklists.  
 
 ## Stack
 
@@ -535,7 +543,7 @@ http_checker/
 
 ## Roadmap
 
-See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1–4** are complete.
+See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1–4** are complete. Post-0.4.0 polish is tracked in [CHANGELOG.md](./CHANGELOG.md) (v0.4.1+). UI declutter (tools accordion / fewer always-on panels) is next.
 
 ## License
 

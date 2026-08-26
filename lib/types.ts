@@ -250,6 +250,8 @@ export interface RedirectHop {
   status: number;
   statusText: string;
   location: string;
+  /** Set-Cookie from this hop (before following Location). */
+  setCookie?: string | string[];
 }
 
 export interface SendResponse {

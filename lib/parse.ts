@@ -1,6 +1,21 @@
 import type { ComposedRequest, ParsedHeader, ParsedRequest } from "./types";
 
+/** Regular header: Name: value */
 const HEADER_LINE = /^([^:\s]+)\s*:\s*(.*)$/;
+/** HTTP/2 pseudo-header: :name: value */
+const PSEUDO_HEADER_LINE = /^(\:[a-zA-Z0-9!#$%&'*+\-.^_`|~]+)\s*:\s*(.*)$/;
+
+export function parseHeaderLine(raw: string): { name: string; value: string } | null {
+  const pseudo = raw.match(PSEUDO_HEADER_LINE);
+  if (pseudo) {
+    return { name: pseudo[1], value: pseudo[2] };
+  }
+  const regular = raw.match(HEADER_LINE);
+  if (regular) {
+    return { name: regular[1], value: regular[2] };
+  }
+  return null;
+}
 
 export function parseHeaderText(headerText: string): ParsedHeader[] {
   const lines = headerText.replace(/\r\n/g, "\n").split("\n");
@@ -8,14 +23,14 @@ export function parseHeaderText(headerText: string): ParsedHeader[] {
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
     if (!raw.trim()) continue;
-    const m = raw.match(HEADER_LINE);
-    if (!m) {
+    const parsed = parseHeaderLine(raw);
+    if (!parsed) {
       headers.push({ name: "", value: "", raw, line: i + 1 });
       continue;
     }
     headers.push({
-      name: m[1],
-      value: m[2],
+      name: parsed.name,
+      value: parsed.value,
       raw,
       line: i + 1,
     });
@@ -37,12 +52,22 @@ export function headersToMap(headers: ParsedHeader[]): Record<string, string> {
   return map;
 }
 
+export function normalizeRequestUrl(url: string): string {
+  const trimmed = (url || "").trim();
+  if (!trimmed) return trimmed;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
+}
+
+export function isHttpUrlTarget(target: URL): boolean {
+  return target.protocol === "http:" || target.protocol === "https:";
+}
+
 export function parseComposedRequest(req: ComposedRequest): ParsedRequest {
   const method = (req.method || "GET").trim().toUpperCase();
-  let url = (req.url || "").trim();
-  if (url && !/^https?:\/\//i.test(url)) {
-    url = `https://${url}`;
-  }
+  const url = normalizeRequestUrl(req.url || "");
   const target = new URL(url);
   const pathWithQuery = `${target.pathname || "/"}${target.search}`;
   const headers = parseHeaderText(req.headerText || "");

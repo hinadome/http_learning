@@ -3,11 +3,11 @@ import { sendHttp1 } from "./http1";
 import { sendHttp2 } from "./http2";
 import { sendHttp3 } from "./http3";
 import { validateRequest } from "../validate/rules";
-import { prepareRequestForSend } from "../request/prepare";
+import { prepareRequestForSend, resolveApplicationProtocol } from "../request/prepare";
 import { executeMockRule, matchMockRule, parseResponseHeaders } from "../learn/mock";
 import {
   applyResponseRewrite,
-  injectRequestHeaders,
+  applyRewriteToRequest,
   matchRewriteRule,
 } from "../learn/rewrite";
 import { runAssertions } from "../learn/assertions";
@@ -129,17 +129,8 @@ function withRewriteInject(
   req: ComposedRequest,
   rules?: RewriteRule[]
 ): { req: ComposedRequest; rewrite?: RewriteRule } {
-  const rule = rules?.length ? matchRewriteRule(rules, req) : undefined;
-  if (!rule?.injectRequestHeaders?.trim()) {
-    return { req, rewrite: rule };
-  }
-  return {
-    req: {
-      ...req,
-      headerText: injectRequestHeaders(req.headerText, rule.injectRequestHeaders),
-    },
-    rewrite: rule,
-  };
+  const { request, rule } = applyRewriteToRequest(req, rules);
+  return { req: request, rewrite: rule };
 }
 
 function finalizeResponse(
@@ -210,7 +201,7 @@ export async function executeRequest(
     );
   }
   const protocolNotes = [...prepareNotes];
-  const protocol = rawReq.protocol ?? "http";
+  const protocol = resolveApplicationProtocol(rawReq);
 
   steps.push({
     id: "compose",

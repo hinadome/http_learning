@@ -6,7 +6,7 @@ export function toHar(log: LearningLog, request: ComposedRequest): string {
   const entry = {
     log: {
       version: "1.2",
-      creator: { name: "HTTP Learning Checker", version: "0.3.0" },
+      creator: { name: "HTTP Learning Checker", version: "0.4.1" },
       entries: [
         {
           startedDateTime: new Date(started).toISOString(),

@@ -9,13 +9,26 @@ import { DocLinks } from "./DocLinks";
 interface Props {
   headers: Record<string, string | string[]>;
   requestUrl: string;
+  /** Set-Cookie from redirect hop(s) when final response omits them. */
+  redirectSetCookies?: Array<string | string[] | undefined>;
 }
 
-export function CookieTeachingPanel({ headers, requestUrl }: Props) {
-  const setCookieEntry = Object.entries(headers).find(
+export function CookieTeachingPanel({
+  headers,
+  requestUrl,
+  redirectSetCookies,
+}: Props) {
+  let setCookieRaw = Object.entries(headers).find(
     ([k]) => k.toLowerCase() === "set-cookie"
-  );
-  const setCookieRaw = setCookieEntry?.[1];
+  )?.[1];
+
+  if (!setCookieRaw && redirectSetCookies?.length) {
+    const flat = redirectSetCookies.flatMap((v) =>
+      v === undefined ? [] : Array.isArray(v) ? v : [v]
+    );
+    if (flat.length) setCookieRaw = flat;
+  }
+
   if (!setCookieRaw) return null;
 
   const cookies = parseSetCookieHeader(setCookieRaw);

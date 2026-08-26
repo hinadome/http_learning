@@ -25,7 +25,11 @@ import {
 } from "@/lib/learn/environments";
 import { applyEnvironment, envToMap } from "@/lib/env/substitute";
 import { loadMockRules } from "@/lib/learn/mock";
-import { loadRewriteRules } from "@/lib/learn/rewrite";
+import {
+  applyRewriteToRequest,
+  loadRewriteRules,
+} from "@/lib/learn/rewrite";
+import { DEFAULT_REQUEST, mergePresetRequest } from "@/lib/learn/default-request";
 import {
   loadTrafficSession,
   newTrafficId,
@@ -59,24 +63,7 @@ import { TlsPanel } from "@/components/TlsPanel";
 import { ConnectLesson } from "@/components/ConnectLesson";
 import { CurriculumPanel } from "@/components/CurriculumPanel";
 
-const DEFAULT: ComposedRequest = {
-  version: "1.1",
-  method: "GET",
-  url: "https://httpbin.org/get",
-  headerText: `Host: httpbin.org
-Accept: application/json
-User-Agent: HTTP-Learning-Checker/1.0`,
-  body: "",
-  sendAnyway: false,
-  allowPrivateTargets: false,
-  followRedirects: false,
-  maxRedirects: 5,
-  protocol: "http",
-  bodyType: "text",
-  graphqlVariables: "{}",
-  multipartFields: [],
-  assertions: [],
-};
+const DEFAULT = DEFAULT_REQUEST;
 
 export default function HomePage() {
   const [request, setRequest] = useState<ComposedRequest>(DEFAULT);
@@ -124,10 +111,15 @@ export default function HomePage() {
     }
   }, []);
 
+  function preparePayload(req: ComposedRequest) {
+    const prepared = loadRequest(req);
+    return applyRewriteToRequest(prepared, loadRewriteRules());
+  }
+
   async function validate() {
     setBusy("validate");
     setCompare(null);
-    const payload = loadRequest(resolvedRequest);
+    const { request: payload, rule: rewriteRule } = preparePayload(resolvedRequest);
     try {
       const res = await fetch("/api/validate", {
         method: "POST",
@@ -135,7 +127,17 @@ export default function HomePage() {
         body: JSON.stringify(payload),
       });
       const data = (await res.json()) as ValidationResult;
-      setValidation(data);
+      const issues = [...data.issues];
+      if (rewriteRule?.injectRequestHeaders?.trim()) {
+        issues.unshift({
+          severity: "info",
+          code: "rewrite_inject",
+          message: `Rewrite rule "${rewriteRule.name}" injects extra header line(s) before validate/send — disable the rule in Rewrite panel if unexpected.`,
+          field: "headers",
+        });
+      }
+      const validationResult = { ...data, issues, ok: !issues.some((i) => i.severity === "error") };
+      setValidation(validationResult);
       setLog({
         steps: [
           {
@@ -147,11 +149,11 @@ export default function HomePage() {
           {
             id: "validate",
             label: "Validate headers for HTTP version",
-            status: data.ok ? "ok" : "error",
-            detail: `${data.issues.length} issue(s)`,
+            status: validationResult.ok ? "ok" : "error",
+            detail: `${validationResult.issues.length} issue(s)`,
           },
         ],
-        validation: data,
+        validation: validationResult,
         encode: { version: payload.version, frames: [], notes: [] },
         timing: { totalMs: 0 },
       });
@@ -225,6 +227,9 @@ export default function HomePage() {
     setCompare(null);
     const payload = {
       ...loadRequest(resolvedRequest),
+      protocol: request.protocol ?? "http",
+      wsOutboundMessage: request.wsOutboundMessage,
+      mqttTopic: request.mqttTopic,
       assertions: request.assertions,
       useMock: request.useMock,
       mockRuleId: request.mockRuleId,
@@ -327,7 +332,7 @@ export default function HomePage() {
             title={p.description}
             className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1 text-xs hover:border-[var(--accent)]"
             onClick={() => {
-              setRequest({ ...p.request });
+              setRequest(mergePresetRequest(p.request));
               setValidation(null);
               setLog(null);
               setCompare(null);
@@ -415,7 +420,7 @@ export default function HomePage() {
             <CollectionsPanel
               request={request}
               onLoad={(req) => {
-                setRequest(req);
+                setRequest(mergePresetRequest(req));
                 setValidation(null);
                 setLog(null);
               }}
@@ -431,7 +436,7 @@ export default function HomePage() {
           />
           <CurriculumPanel
             onLoadPreset={(req) => {
-              setRequest(req);
+              setRequest(mergePresetRequest(req));
               setValidation(null);
               setLog(null);
               setCompare(null);

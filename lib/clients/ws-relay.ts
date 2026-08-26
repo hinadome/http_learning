@@ -17,7 +17,7 @@ export async function relayWebSocket(options: {
   if (!/^wss?:$/i.test(target.protocol)) {
     throw new Error("URL must use ws: or wss: scheme");
   }
-  await assertSafeTarget(target, options.allowPrivateTargets);
+  await assertSafeTarget(target, options.allowPrivateTargets, ["ws:", "wss:"]);
 
   const timeoutMs = Math.min(options.timeoutMs ?? 5000, 15000);
   const messages: string[] = [];

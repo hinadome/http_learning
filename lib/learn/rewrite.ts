@@ -1,4 +1,4 @@
-import type { RewriteRule, SendResponse } from "../types";
+import type { ComposedRequest, RewriteRule, SendResponse } from "../types";
 import { parseComposedRequest } from "../parse";
 import { parseResponseHeaders } from "./mock";
 
@@ -44,6 +44,23 @@ export function matchRewriteRule(
       return path.includes(r.pathPattern);
     }
   });
+}
+
+export function applyRewriteToRequest(
+  req: ComposedRequest,
+  rules?: RewriteRule[]
+): { request: ComposedRequest; rule?: RewriteRule } {
+  const rule = rules?.length ? matchRewriteRule(rules, req) : undefined;
+  if (!rule?.injectRequestHeaders?.trim()) {
+    return { request: req, rule };
+  }
+  return {
+    request: {
+      ...req,
+      headerText: injectRequestHeaders(req.headerText, rule.injectRequestHeaders),
+    },
+    rule,
+  };
 }
 
 export function injectRequestHeaders(

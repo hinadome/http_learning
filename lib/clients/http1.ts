@@ -82,6 +82,11 @@ async function sendHttp1Once(
     ? { ...req, url: urlOverride }
     : req;
   const parsed = parseComposedRequest(working);
+  if (/^wss?:$/i.test(parsed.target.protocol)) {
+    throw new Error(
+      "URL uses ws: or wss: — set Protocol to WebSocket (HTTP client cannot send this URL)."
+    );
+  }
   await assertSafeTarget(parsed.target, req.allowPrivateTargets);
 
   const hasHost = headersHas(working, "Host");
@@ -222,6 +227,17 @@ async function sendHttp1Once(
   return { response, sent, ttfbMs, connectMs, tlsInfo };
 }
 
+function getSetCookieHeader(
+  headers: Record<string, string | string[]>
+): string | string[] | undefined {
+  for (const [k, v] of Object.entries(headers)) {
+    if (k.toLowerCase() === "set-cookie" && v !== undefined) {
+      return v;
+    }
+  }
+  return undefined;
+}
+
 function getLocationHeader(
   headers: Record<string, string | string[]>
 ): string | undefined {
@@ -301,7 +317,8 @@ export async function sendHttp1(
         currentUrl,
         result.response.status,
         result.response.statusText,
-        location
+        location,
+        getSetCookieHeader(result.response.headers)
       )
     );
 

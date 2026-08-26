@@ -9,6 +9,7 @@ import { DocLinks } from "./DocLinks";
 import { QueryParamsEditor } from "./QueryParamsEditor";
 import { AuthEditor } from "./AuthEditor";
 import { ImportPanel } from "./ImportPanel";
+import { ProtocolExplainPanel } from "./ProtocolExplainPanel";
 
 const VERSIONS: HttpVersion[] = ["1.0", "1.1", "2", "3"];
 const METHODS = Object.keys(METHOD_INFO);
@@ -130,12 +131,23 @@ export function RequestEditor({ value, onChange, onImportCollection }: Props) {
               <select
                 className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm"
                 value={value.protocol ?? "http"}
-                onChange={(e) =>
-                  onChange({
-                    ...value,
-                    protocol: e.target.value as RequestProtocol,
-                  })
-                }
+                onChange={(e) => {
+                  const protocol = e.target.value as RequestProtocol;
+                  const next: ComposedRequest = { ...value, protocol };
+                  if (protocol === "graphql") {
+                    next.bodyType = "graphql";
+                    next.method = "POST";
+                    if (!next.graphqlVariables?.trim()) {
+                      next.graphqlVariables = "{}";
+                    }
+                  } else if (
+                    value.protocol === "graphql" &&
+                    (value.bodyType ?? "text") === "graphql"
+                  ) {
+                    next.bodyType = "json";
+                  }
+                  onChange(next);
+                }}
               >
                 <option value="http">HTTP / REST</option>
                 <option value="graphql">GraphQL</option>
@@ -167,13 +179,18 @@ export function RequestEditor({ value, onChange, onImportCollection }: Props) {
             </label>
           </div>
 
-          {(value.protocol === "websocket" || value.protocol === "mqtt") && (
-            <p className="rounded border border-[var(--border)] px-3 py-2 text-xs text-[var(--muted)]">
-              {value.protocol === "websocket"
-                ? "URL should be ws: or wss: (e.g. wss://echo.websocket.org). Optional outbound message below."
-                : "URL = MQTT broker (e.g. mqtt://test.mosquitto.org:1883). Set topic below; body = payload."}
+          {value.url.includes("cookies/set") && (value.protocol ?? "http") === "http" && (
+            <p className="rounded border border-[var(--warn)]/40 bg-[var(--warn-soft)] px-3 py-2 text-xs text-[var(--muted)]">
+              <strong className="text-[var(--fg)]">Set-Cookie lab:</strong> use
+              the three preset headers only. Keep <strong>Follow redirects</strong>{" "}
+              off to see <code className="font-mono">302</code> +{" "}
+              <code className="font-mono">Set-Cookie</code> on the Response tab. The
+              server <em>responds</em> with Set-Cookie — do not paste cookie lines into
+              request headers.
             </p>
           )}
+
+          <ProtocolExplainPanel protocol={value.protocol} />
 
           {value.protocol === "mqtt" && (
             <label className="flex flex-col gap-1 text-sm">

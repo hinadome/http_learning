@@ -61,6 +61,17 @@ export function ValidationPanel({ result }: Props) {
         </div>
       )}
 
+      {result.issues.some((i) => i.code === "rewrite_inject") && (
+        <div className="mb-3 rounded border border-[var(--info)]/40 bg-[var(--accent-soft)] px-3 py-2 text-sm">
+          <p className="font-medium">Rewrite rule active</p>
+          <p className="mt-1 text-[var(--muted)]">
+            A rewrite rule injected header lines for validate/send. The editor
+            shows your typed headers only — disable or fix the rule in the
+            Rewrite panel if validation fails on line 4+.
+          </p>
+        </div>
+      )}
+
       <ul className="flex flex-col gap-2">
         {result.issues.map((issue, i) => (
           <li

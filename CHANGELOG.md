@@ -12,6 +12,30 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.4.1] — 2026-08-25
+
+### Added
+- **Protocol explain panel** — when Protocol changes, shows prepare / validate / send behavior + URL hint
+- **WebSocket echo preset** — `wss://echo.websocket.org` with outbound message
+- **Session traffic detail** — click a row for headers, timing, response preview
+- **Set-Cookie on redirect hops** — `Set-Cookie` captured from 302 hops; teaching panel uses hop data when the final response has none
+- Empty-cookies callout when follow-redirects + no cookie jar yields `{"cookies":{}}`
+
+### Fixed
+- **WebSocket Send** — `ws:`/`wss:` allowed by safety check; URL scheme auto-routes to WS relay even if Protocol field is missing
+- **URL parse** — preserve `ws:`, `wss:`, `mqtt:` schemes (no longer prepend `https://`)
+- **Validation for WebSocket/MQTT** — skip HTTP Host / H2 wire rules; clearer cookie/header line hints
+- **Pseudo-header lines** — parse `:authority:` etc. in the header box
+- **Validate ↔ Send parity** — rewrite inject applied on Validate; rewrite-active notice in Validation panel
+- **Preset load** — merge over full defaults so Protocol/mock/assertions from prior labs do not stick
+- **Set-Cookie lab** — Follow redirects off by default so 302 + `Set-Cookie` is visible
+- New rewrite rules default to **disabled**
+
+### Changed
+- Selecting Protocol **GraphQL** sets Body type to GraphQL query (and Method POST)
+
+---
+
 ## [0.4.0] — 2026-08-25
 
 ### Added

@@ -1,5 +1,10 @@
 import { docsForIssue } from "../learn/docs";
-import { getHeader, hasHeader, parseComposedRequest } from "../parse";
+import {
+  getHeader,
+  hasHeader,
+  isHttpUrlTarget,
+  parseComposedRequest,
+} from "../parse";
 import type {
   ComposedRequest,
   ValidationIssue,
@@ -26,7 +31,30 @@ const CONNECTION_SPECIFIC = new Set([
   "proxy-connection",
 ]);
 
-const HEADER_NAME_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+const HEADER_NAME_RE =
+  /^(\:[a-zA-Z0-9!#$%&'*+\-.^_`|~]+|[!#$%&'*+\-.^_`|~0-9A-Za-z]+)$/;
+
+function badHeaderLineHint(line: number, raw: string): string {
+  const trimmed = raw.trim();
+  if (line > 3) {
+    return `Line ${line}: header must look like "Name: value". Check Rewrite panel — an enabled inject rule may add lines not shown in the editor.`;
+  }
+  if (/^set-cookie(\s|$)/i.test(trimmed) && !/^set-cookie\s*:/i.test(trimmed)) {
+    return `Line ${line}: use "Set-Cookie: value" (colon after the name). For the Set-Cookie lab, leave request headers as the preset — httpbin returns Set-Cookie on the response.`;
+  }
+  if (
+    /^(path|domain|expires|max-age|samesite|secure|httponly)$/i.test(trimmed)
+  ) {
+    return `Line ${line}: "${trimmed}" is a cookie attribute, not a request header line. Remove it from request headers.`;
+  }
+  if (/^[\w.-]+=[^:]*$/.test(trimmed)) {
+    return `Line ${line}: looks like "name=value" without a header name. To send a cookie use "Cookie: ${trimmed}", or remove the line for the Set-Cookie response lab.`;
+  }
+  if (/^cookie\s+\S/i.test(trimmed) && !/^cookie\s*:/i.test(trimmed)) {
+    return `Line ${line}: use "Cookie: name=value" (colon after Cookie).`;
+  }
+  return `Line ${line}: header must look like "Name: value".`;
+}
 
 function issue(
   severity: ValidationIssue["severity"],
@@ -78,13 +106,35 @@ export function validateRequest(req: ComposedRequest): ValidationResult {
     );
   }
 
+  const appProtocol = req.protocol ?? "http";
+  const usesHttpWireRules =
+    appProtocol !== "websocket" &&
+    appProtocol !== "mqtt" &&
+    isHttpUrlTarget(parsed.target);
+
+  if (!usesHttpWireRules && (appProtocol === "websocket" || appProtocol === "mqtt")) {
+    issues.push(
+      issue(
+        "info",
+        "non_http_protocol",
+        appProtocol === "websocket"
+          ? "WebSocket mode: HTTP Host and HTTP/2 wire rules are skipped. URL must be ws: or wss:; Send uses the WebSocket relay (headers below are not sent as HTTP)."
+          : "MQTT mode: HTTP Host and HTTP/2 wire rules are skipped. URL is the broker; Send uses the MQTT bridge.",
+        "protocol"
+      )
+    );
+  }
+
   for (const h of parsed.headers) {
+    const headerSeverity = usesHttpWireRules ? "error" : "info";
     if (!h.name) {
       issues.push(
         issue(
-          "error",
+          headerSeverity,
           "bad_header_line",
-          `Line ${h.line}: header must look like "Name: value".`,
+          usesHttpWireRules
+            ? badHeaderLineHint(h.line, h.raw)
+            : `Line ${h.line}: not a "Name: value" line (ignored in ${appProtocol} mode — headers are not sent as HTTP).`,
           "headers"
         )
       );
@@ -93,9 +143,11 @@ export function validateRequest(req: ComposedRequest): ValidationResult {
     if (!HEADER_NAME_RE.test(h.name)) {
       issues.push(
         issue(
-          "error",
+          headerSeverity,
           "bad_header_name",
-          `Line ${h.line}: invalid header name "${h.name}".`,
+          usesHttpWireRules
+            ? `Line ${h.line}: invalid header name "${h.name}".`
+            : `Line ${h.line}: header name "${h.name}" is not used in ${appProtocol} mode.`,
           "headers"
         )
       );
@@ -103,7 +155,7 @@ export function validateRequest(req: ComposedRequest): ValidationResult {
     if (/[\r\n]/.test(h.value)) {
       issues.push(
         issue(
-          "error",
+          headerSeverity,
           "header_newline",
           `Line ${h.line}: header values cannot contain newlines.`,
           "headers"
@@ -218,8 +270,8 @@ export function validateRequest(req: ComposedRequest): ValidationResult {
     }
   }
 
-  // Version-specific
-  if (parsed.version === "1.0") {
+  // Version-specific HTTP wire rules (skip for WebSocket / MQTT / non-http(s) URLs)
+  if (parsed.version === "1.0" && usesHttpWireRules) {
     if (transferEncoding?.value.toLowerCase().includes("chunked")) {
       issues.push(
         issue(
@@ -242,7 +294,7 @@ export function validateRequest(req: ComposedRequest): ValidationResult {
     }
   }
 
-  if (parsed.version === "1.1") {
+  if (parsed.version === "1.1" && usesHttpWireRules) {
     if (!hasHeader(parsed.headers, "Host")) {
       issues.push(
         issue(
@@ -275,7 +327,7 @@ export function validateRequest(req: ComposedRequest): ValidationResult {
     }
   }
 
-  if (parsed.version === "2" || parsed.version === "3") {
+  if ((parsed.version === "2" || parsed.version === "3") && usesHttpWireRules) {
     for (const h of parsed.headers) {
       if (!h.name) continue;
       const lower = h.name.toLowerCase();

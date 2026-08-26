@@ -30,7 +30,8 @@ export function buildRedirectHop(
   url: string,
   status: number,
   statusText: string,
-  location: string
+  location: string,
+  setCookie?: string | string[]
 ): RedirectHop {
-  return { hop, url, status, statusText, location };
+  return { hop, url, status, statusText, location, setCookie };
 }

@@ -128,7 +128,7 @@ export function RewritePanel() {
             {
               id: newRewriteRuleId(),
               name: "New rewrite",
-              enabled: true,
+              enabled: false,
               pathPattern: "/.*",
             },
           ])

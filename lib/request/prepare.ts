@@ -1,4 +1,24 @@
-import type { ComposedRequest, MultipartField } from "../types";
+import type { ComposedRequest, MultipartField, RequestProtocol } from "../types";
+import { normalizeRequestUrl } from "../parse";
+
+export function resolveApplicationProtocol(
+  req: ComposedRequest
+): RequestProtocol {
+  const declared = req.protocol ?? "http";
+  let scheme = "";
+  try {
+    scheme = new URL(normalizeRequestUrl(req.url || "")).protocol;
+  } catch {
+    return declared;
+  }
+  if (declared === "websocket" || scheme === "ws:" || scheme === "wss:") {
+    return "websocket";
+  }
+  if (declared === "mqtt" || scheme === "mqtt:" || scheme === "mqtts:") {
+    return "mqtt";
+  }
+  return declared;
+}
 
 export function newMultipartFieldId(): string {
   return `mp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;

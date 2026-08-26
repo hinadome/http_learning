@@ -38,10 +38,13 @@ export function isPrivateIp(ip: string): boolean {
 
 export async function assertSafeTarget(
   url: URL,
-  allowPrivateTargets = false
+  allowPrivateTargets = false,
+  allowedProtocols: readonly string[] = ["http:", "https:"]
 ): Promise<void> {
-  if (!["http:", "https:"].includes(url.protocol)) {
-    throw new Error("Only http: and https: URLs are allowed.");
+  if (!allowedProtocols.includes(url.protocol)) {
+    throw new Error(
+      `Only ${allowedProtocols.join(", ")} URLs are allowed.`
+    );
   }
 
   const host = url.hostname.toLowerCase();

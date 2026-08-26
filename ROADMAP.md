@@ -64,7 +64,7 @@ Feature gaps vs similar tools ([How HTTP Works](https://howhttpworks.com/tools),
 3. **Auth** tab → Bearer token → `Authorization` header appears
 4. Preset **Lab: Redirect (302)** → Send without follow → see 302 callout
 5. Enable **Follow redirects** → Send → redirect chain in Response tab
-6. Preset **Lab: Set-Cookie response** → Cookie teaching on Response tab
+6. Preset **Lab: Set-Cookie response** → Follow redirects **off** → Set-Cookie teaching on Response tab (302). Follow redirects → empty cookies JSON is expected (no cookie jar).
 7. **Compare 2 vs 3** + **Multiplex lesson** panel
 
 ---
@@ -76,12 +76,13 @@ Feature gaps vs similar tools ([How HTTP Works](https://howhttpworks.com/tools),
 3. **Assertions** — add status `200` → Send → see pass/fail on Response tab
 4. **Export** — Copy Python / axios / Go from export bar
 5. **GraphQL** — protocol GraphQL, query in body → Send
-6. **WebSocket** — `wss://echo.websocket.org`, outbound message → Send
+6. **WebSocket** — preset **WebSocket echo** or `wss://echo.websocket.org` → Send (live frames)
 7. **Multipart** — body type multipart, add fields → Send to httpbin.org/post
 8. **Mock** — create rule, enable Use mock → Send (no network)
 9. **Share URL** — copy link, open in new tab → request restored
 10. **OpenAPI** — Import tab → paste minimal OpenAPI JSON
 11. **CI** — Collections → Copy Postman JSON or Copy CI shell
+12. **GraphQL** — Protocol GraphQL → body type becomes GraphQL → Send
 
 ---
 

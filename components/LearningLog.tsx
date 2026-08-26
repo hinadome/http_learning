@@ -222,6 +222,14 @@ function ResponseView({
                 <span className="text-[var(--muted)]">{h.url}</span>
                 {" → "}
                 {h.location}
+                {h.setCookie && (
+                  <span className="mt-1 block text-[10px] text-[var(--warn)]">
+                    Set-Cookie on this hop
+                    {Array.isArray(h.setCookie)
+                      ? ` (${h.setCookie.length})`
+                      : ""}
+                  </span>
+                )}
               </li>
             ))}
           </ol>
@@ -236,7 +244,26 @@ function ResponseView({
       <CookieTeachingPanel
         headers={res.headers}
         requestUrl={requestUrl ?? log.finalUrl ?? ""}
+        redirectSetCookies={log.redirectChain?.map((h) => h.setCookie)}
       />
+
+      {log.redirectChain &&
+        log.redirectChain.length > 0 &&
+        res.body.includes('"cookies"') &&
+        res.body.includes("{}") && (
+          <div className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm">
+            <p className="font-medium">Empty cookies JSON</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              httpbin’s <code className="font-mono">/cookies</code> echoes cookies
+              the client sends back. This Node proxy does not keep a cookie jar, so
+              after a redirect the body is often{" "}
+              <code className="font-mono">{`{"cookies": {}}`}</code>. Set-Cookie
+              was still sent on the earlier 302 hop — see redirect chain or disable{" "}
+              <strong>Follow redirects</strong> to inspect Set-Cookie on the first
+              response.
+            </p>
+          </div>
+        )}
 
       {log.assertionResults && log.assertionResults.length > 0 && (
         <div>
