@@ -12,6 +12,14 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.5.0] — 2026-08-25
+
+### Changed
+- **UI declutter** — presets → dropdown; Compare / Copy as menus; Client / Intercept / Learn accordions (collapsed by default); shorter header with optional safety note; H2–3 lessons only when version is 2/3
+- Components: `AccordionSection`, `PresetSelect`; `ExportBar` is a format picker
+
+---
+
 ## [0.4.1] — 2026-08-25
 
 ### Added

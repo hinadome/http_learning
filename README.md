@@ -543,7 +543,7 @@ http_checker/
 
 ## Roadmap
 
-See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1–4** are complete. Post-0.4.0 polish is tracked in [CHANGELOG.md](./CHANGELOG.md) (v0.4.1+). UI declutter (tools accordion / fewer always-on panels) is next.
+See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1–4** are complete. Current release: **v0.5.0** (UI declutter). See [CHANGELOG.md](./CHANGELOG.md).
 
 ## License
 

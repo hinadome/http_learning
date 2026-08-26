@@ -37,6 +37,7 @@ export function ExportBar({ request, log }: Props) {
   }, [request, log]);
 
   async function copy(label: string, text: string) {
+    if (!text) return;
     await navigator.clipboard.writeText(text);
     setCopied(label);
     setTimeout(() => setCopied(null), 1500);
@@ -44,7 +45,7 @@ export function ExportBar({ request, log }: Props) {
 
   if (!codes) return null;
 
-  const buttons: Array<[string, string]> = [
+  const options: Array<[string, string]> = [
     ["curl", codes.curl],
     ["fetch", codes.fetch],
     ["python", codes.python],
@@ -52,21 +53,30 @@ export function ExportBar({ request, log }: Props) {
     ["go", codes.go],
     ["raw", codes.raw],
   ];
-  if (codes.har) buttons.push(["har", codes.har]);
+  if (codes.har) options.push(["har", codes.har]);
 
   return (
-    <div className="flex flex-wrap gap-2">
-      {buttons.map(([label, text]) => (
-        <button
-          key={label}
-          type="button"
-          className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-sm"
-          disabled={!text}
-          onClick={() => copy(label, text)}
-        >
-          {copied === label ? `Copied ${label}` : `Copy ${label}`}
-        </button>
-      ))}
-    </div>
+    <label className="flex items-center gap-2 text-sm">
+      <span className="text-[var(--muted)]">Copy as</span>
+      <select
+        className="rounded border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-sm"
+        value=""
+        onChange={(e) => {
+          const label = e.target.value;
+          const pair = options.find(([l]) => l === label);
+          if (pair) void copy(pair[0], pair[1]);
+          e.target.value = "";
+        }}
+      >
+        <option value="">
+          {copied ? `Copied ${copied}` : "Choose format…"}
+        </option>
+        {options.map(([label]) => (
+          <option key={label} value={label}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
