@@ -2,10 +2,12 @@
 
 import type { EncodeResult, LearningLog } from "@/lib/types";
 import { QuicTimelinePanel } from "./QuicTimelinePanel";
+import { ComposedVsSentDiff } from "./ComposedVsSentDiff";
 
 interface Props {
   encode: EncodeResult | null;
   sent?: LearningLog["sent"] | null;
+  composedHeaderText?: string;
   compare?: {
     left: EncodeResult;
     right: EncodeResult;
@@ -14,7 +16,12 @@ interface Props {
   } | null;
 }
 
-export function BinaryFrameView({ encode, sent, compare }: Props) {
+export function BinaryFrameView({
+  encode,
+  sent,
+  compare,
+  composedHeaderText,
+}: Props) {
   if (compare) {
     return (
       <div className="grid gap-4 lg:grid-cols-2">
@@ -35,6 +42,13 @@ export function BinaryFrameView({ encode, sent, compare }: Props) {
   return (
     <div className="flex flex-col gap-6">
       {sent && <SentBlock sent={sent} />}
+      {sent && composedHeaderText != null && (
+        <ComposedVsSentDiff
+          composedHeaders={composedHeaderText}
+          sentHeaders={sent.headersSent}
+          notes={sent.notes}
+        />
+      )}
       {encode?.quicTimeline && encode.quicTimeline.length > 0 && (
         <QuicTimelinePanel steps={encode.quicTimeline} />
       )}

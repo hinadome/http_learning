@@ -14,6 +14,7 @@ interface Props {
   tab: "lifecycle" | "wire" | "response";
   onTab: (t: "lifecycle" | "wire" | "response") => void;
   requestUrl?: string;
+  composedHeaderText?: string;
 }
 
 export function LearningLogView({
@@ -22,6 +23,7 @@ export function LearningLogView({
   tab,
   onTab,
   requestUrl,
+  composedHeaderText,
 }: Props) {
   return (
     <section className="flex flex-col gap-3">
@@ -77,6 +79,7 @@ export function LearningLogView({
           encode={log?.encode ?? null}
           sent={log?.sent ?? null}
           compare={compare}
+          composedHeaderText={composedHeaderText}
         />
       )}
 

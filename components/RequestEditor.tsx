@@ -418,6 +418,18 @@ export function RequestEditor({ value, onChange, onImportCollection }: Props) {
                 Follow redirects (3xx Location) — shows redirect chain
               </label>
             )}
+            {(value.protocol ?? "http") === "http" && (
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={Boolean(value.useCookieJar)}
+                  onChange={(e) =>
+                    onChange({ ...value, useCookieJar: e.target.checked })
+                  }
+                />
+                Cookie jar — store Set-Cookie and send Cookie on later hops / Sends
+              </label>
+            )}
           </div>
         </>
       )}

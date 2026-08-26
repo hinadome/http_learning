@@ -249,6 +249,45 @@ function getLocationHeader(
   return undefined;
 }
 
+function mergeCookieFromSetCookie(
+  existingCookie: string | undefined,
+  setCookie: string | string[] | undefined
+): string | undefined {
+  if (!setCookie) return existingCookie;
+  const map = new Map<string, string>();
+  if (existingCookie) {
+    for (const part of existingCookie.split(";")) {
+      const t = part.trim();
+      const eq = t.indexOf("=");
+      if (eq > 0) map.set(t.slice(0, eq).trim(), t.slice(eq + 1).trim());
+    }
+  }
+  const list = Array.isArray(setCookie) ? setCookie : [setCookie];
+  for (const raw of list) {
+    const first = raw.split(";")[0]?.trim() ?? "";
+    const eq = first.indexOf("=");
+    if (eq <= 0) continue;
+    const name = first.slice(0, eq).trim();
+    const value = first.slice(eq + 1).trim();
+    if (value === "") map.delete(name);
+    else map.set(name, value);
+  }
+  if (map.size === 0) return undefined;
+  return [...map.entries()].map(([k, v]) => `${k}=${v}`).join("; ");
+}
+
+function upsertHeaderInText(
+  headerText: string,
+  name: string,
+  value: string
+): string {
+  const lines = headerText.split(/\r?\n/).filter((l) => {
+    return !l.toLowerCase().startsWith(name.toLowerCase() + ":");
+  });
+  lines.push(`${name}: ${value}`);
+  return lines.filter((l) => l.trim() || l === "").join("\n");
+}
+
 export async function sendHttp1(
   req: ComposedRequest,
   steps: LifecycleStep[]
@@ -293,11 +332,24 @@ export async function sendHttp1(
   let currentUrl = req.url;
   let currentMethod = req.method;
   let currentBody = req.body;
+  let headerText = req.headerText;
+  let jarCookie: string | undefined;
+
+  if (req.useCookieJar) {
+    const existing = headerText
+      .split(/\r?\n/)
+      .find((l) => l.toLowerCase().startsWith("cookie:"));
+    if (existing) {
+      jarCookie = existing.slice(existing.indexOf(":") + 1).trim();
+    }
+  }
+
   let result = await sendHttp1Once({
     ...req,
     method: currentMethod,
     body: currentBody,
     url: currentUrl,
+    headerText,
   });
 
   let hop = 0;
@@ -309,6 +361,7 @@ export async function sendHttp1(
     const location = getLocationHeader(result.response.headers);
     if (!location) break;
 
+    const setCookie = getSetCookieHeader(result.response.headers);
     const nextUrl = resolveRedirectLocation(location, currentUrl);
     hop += 1;
     redirectChain.push(
@@ -318,9 +371,22 @@ export async function sendHttp1(
         result.response.status,
         result.response.statusText,
         location,
-        getSetCookieHeader(result.response.headers)
+        setCookie
       )
     );
+
+    if (req.useCookieJar) {
+      jarCookie = mergeCookieFromSetCookie(jarCookie, setCookie);
+      if (jarCookie) {
+        headerText = upsertHeaderInText(headerText, "Cookie", jarCookie);
+        steps.push({
+          id: `cookie-jar-${hop}`,
+          label: "Cookie jar: apply Set-Cookie on next hop",
+          status: "ok",
+          detail: jarCookie.slice(0, 120),
+        });
+      }
+    }
 
     currentMethod = methodAfterRedirect(result.response.status, currentMethod);
     if (currentMethod === "GET") currentBody = "";
@@ -339,6 +405,7 @@ export async function sendHttp1(
         method: currentMethod,
         body: currentBody,
         url: currentUrl,
+        headerText,
       },
       currentUrl
     );

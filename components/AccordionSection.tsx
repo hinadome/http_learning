@@ -1,8 +1,10 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
+import { loadUiPrefs, setAccordionOpen } from "@/lib/learn/ui-prefs";
 
 interface Props {
+  id: string;
   title: string;
   summary?: string;
   defaultOpen?: boolean;
@@ -10,6 +12,7 @@ interface Props {
 }
 
 export function AccordionSection({
+  id,
   title,
   summary,
   defaultOpen = false,
@@ -18,6 +21,21 @@ export function AccordionSection({
   const [open, setOpen] = useState(defaultOpen);
   const panelId = useId();
 
+  useEffect(() => {
+    const prefs = loadUiPrefs();
+    if (typeof prefs.accordionOpen[id] === "boolean") {
+      setOpen(prefs.accordionOpen[id]);
+    }
+  }, [id]);
+
+  function toggle() {
+    setOpen((v) => {
+      const next = !v;
+      setAccordionOpen(id, next);
+      return next;
+    });
+  }
+
   return (
     <section className="rounded border border-[var(--border)] bg-[var(--panel)]">
       <button
@@ -25,7 +43,7 @@ export function AccordionSection({
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
       >
         <span>
           <span className="block text-sm font-semibold">{title}</span>

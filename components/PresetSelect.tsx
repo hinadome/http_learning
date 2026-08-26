@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { PRESETS } from "@/lib/learn/presets";
+import { getLabGuide } from "@/lib/learn/lab-guides";
 import type { ComposedRequest } from "@/lib/types";
+import { DocLinks } from "./DocLinks";
 
 interface Props {
   selectedId: string | null;
@@ -12,6 +15,8 @@ export function PresetSelect({ selectedId, onSelect }: Props) {
   const selected = selectedId
     ? PRESETS.find((p) => p.id === selectedId)
     : undefined;
+  const guide = getLabGuide(selectedId);
+  const [checked, setChecked] = useState<Record<number, boolean>>({});
 
   return (
     <div className="flex w-full max-w-xl flex-col gap-2">
@@ -24,7 +29,10 @@ export function PresetSelect({ selectedId, onSelect }: Props) {
             const id = e.target.value;
             if (!id) return;
             const preset = PRESETS.find((p) => p.id === id);
-            if (preset) onSelect(preset.id, preset.request);
+            if (preset) {
+              setChecked({});
+              onSelect(preset.id, preset.request);
+            }
           }}
         >
           <option value="">Choose a preset…</option>
@@ -42,10 +50,45 @@ export function PresetSelect({ selectedId, onSelect }: Props) {
           <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">
             {selected.description}
           </p>
-          <p className="mt-2 text-[10px] text-[var(--muted)]">
-            Tip: Validate → Encode → Send to walk through this lab. Use the
-            Response / Wire tabs for teaching panels.
-          </p>
+          {guide?.why && (
+            <p className="mt-2 text-xs text-[var(--muted)]">
+              <strong className="text-[var(--fg)]">Why:</strong> {guide.why}
+            </p>
+          )}
+          {guide && guide.steps.length > 0 && (
+            <div className="mt-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                Try this
+              </p>
+              <ul className="mt-1 flex flex-col gap-1.5">
+                {guide.steps.map((step, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={Boolean(checked[i])}
+                      onChange={(e) =>
+                        setChecked((prev) => ({
+                          ...prev,
+                          [i]: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span
+                      className={
+                        checked[i]
+                          ? "text-[var(--muted)] line-through"
+                          : "text-[var(--foreground)]"
+                      }
+                    >
+                      {step}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {guide.docs && <DocLinks docs={guide.docs} className="mt-2" />}
+            </div>
+          )}
         </div>
       )}
     </div>

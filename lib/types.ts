@@ -1,7 +1,7 @@
 export type HttpVersion = "1.0" | "1.1" | "2" | "3";
 
 /** Optional encode-only lab mode (Wire tab). */
-export type EncodeLab = "chunked" | "h2-trailers" | "h2-push";
+export type EncodeLab = "chunked" | "h2-trailers" | "h2-push" | "cl-te-smuggle";
 
 export interface TlsInfo {
   protocol?: string;
@@ -158,6 +158,8 @@ export interface ComposedRequest {
   /** Follow 3xx Location hops (HTTP/1.x send only). Default false for teaching. */
   followRedirects?: boolean;
   maxRedirects?: number;
+  /** Educational cookie jar: store Set-Cookie and send Cookie on later requests / redirect hops. */
+  useCookieJar?: boolean;
   /** Multi-protocol mode (default http). */
   protocol?: RequestProtocol;
   bodyType?: BodyType;

@@ -21,6 +21,7 @@ function base(
     sendAnyway: false,
     followRedirects: partial.followRedirects ?? false,
     maxRedirects: partial.maxRedirects ?? 5,
+    useCookieJar: partial.useCookieJar ?? false,
     protocol: partial.protocol ?? "http",
     bodyType: partial.bodyType ?? "text",
     graphqlVariables: partial.graphqlVariables ?? "{}",
@@ -264,6 +265,24 @@ User-Agent: HTTP-Learning-Checker/1.0`,
       headerText: "",
       protocol: "websocket",
       wsOutboundMessage: "Hello",
+    }),
+  },
+  {
+    id: "cl-te-smuggling",
+    title: "Lab: CL + TE (encode only)",
+    description:
+      "Ambiguous Content-Length + Transfer-Encoding — Encode to study smuggling risk. Do not Send to systems you do not own.",
+    request: base({
+      version: "1.1",
+      method: "POST",
+      url: "https://httpbin.org/post",
+      headerText: `Host: httpbin.org
+Transfer-Encoding: chunked
+Content-Length: 13
+Content-Type: text/plain`,
+      body: "smuggle-demo",
+      encodeLab: "cl-te-smuggle",
+      sendAnyway: false,
     }),
   },
   {

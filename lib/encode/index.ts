@@ -4,7 +4,7 @@ import type {
   ComparePair,
   EncodeResult,
 } from "../types";
-import { encodeHttp1, encodeHttp1Chunked } from "./http1";
+import { encodeHttp1, encodeHttp1Chunked, encodeHttp1ClTeSmuggle } from "./http1";
 import { encodeHttp2 } from "./http2-frames";
 import { encodeHttp2WithPush, encodeHttp2WithTrailers } from "./http2-labs";
 import { encodeHttp3 } from "./http3-frames";
@@ -12,6 +12,9 @@ import { encodeHttp3 } from "./http3-frames";
 export type { ComparePair };
 
 export function encodeRequest(req: ComposedRequest): EncodeResult {
+  if (req.encodeLab === "cl-te-smuggle") {
+    return encodeHttp1ClTeSmuggle(req);
+  }
   if (req.encodeLab === "chunked" && (req.version === "1.0" || req.version === "1.1")) {
     return encodeHttp1Chunked(req);
   }

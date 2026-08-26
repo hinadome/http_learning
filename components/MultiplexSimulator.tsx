@@ -26,6 +26,9 @@ function emptyStreams(): StreamState[] {
 export function MultiplexSimulator() {
   const [mode, setMode] = useState<Mode>("h2");
   const [packetLoss, setPacketLoss] = useState(true);
+  const [lossSeverity, setLossSeverity] = useState<"light" | "medium" | "heavy">(
+    "medium"
+  );
   const [running, setRunning] = useState(false);
   const [streams, setStreams] = useState<StreamState[]>(emptyStreams);
   const [phaseNote, setPhaseNote] = useState("");
@@ -109,10 +112,12 @@ export function MultiplexSimulator() {
     }
 
     // With packet loss — the teaching difference
+    const stallMs =
+      lossSeverity === "light" ? 600 : lossSeverity === "heavy" ? 2200 : 1100;
     setPhaseNote(
       mode === "h2"
-        ? "HTTP/2 over TCP: streams share one byte stream — loss stalls the whole connection."
-        : "HTTP/3 over QUIC: loss is per-stream — other streams keep progressing."
+        ? `HTTP/2 over TCP (${lossSeverity} loss): streams share one byte stream — loss stalls the whole connection.`
+        : `HTTP/3 over QUIC (${lossSeverity} loss): loss is per-stream — other streams keep progressing.`
     );
 
     // All streams start progressing in parallel
@@ -158,7 +163,7 @@ export function MultiplexSimulator() {
         setStreams((prev) =>
           prev.map((s) => ({ ...s, stalled: false, progress: 70 }))
         );
-      }, 1800);
+      }, 700 + stallMs);
       for (let i = 0; i < ASSETS; i++) {
         schedule(() => {
           setStreams((prev) => {
@@ -166,14 +171,14 @@ export function MultiplexSimulator() {
             next[i] = { progress: 100, stalled: false, done: true };
             return next;
           });
-        }, 2100 + i * 60);
+        }, 700 + stallMs + 300 + i * 60);
       }
       schedule(() => {
         setRunning(false);
         setPhaseNote(
           "HTTP/2 lesson: multiplexing helps, but TCP HOL can still freeze every stream. Compare with HTTP/3 + loss."
         );
-      }, 2100 + ASSETS * 60 + 200);
+      }, 700 + stallMs + 300 + ASSETS * 60 + 200);
     } else {
       // H3: non-loss streams finish during the stall
       for (let i = 0; i < ASSETS; i++) {
@@ -196,22 +201,22 @@ export function MultiplexSimulator() {
           next[LOSS_STREAM] = { progress: 70, stalled: false, done: false };
           return next;
         });
-      }, 2000);
+      }, 700 + stallMs);
       schedule(() => {
         setStreams((prev) => {
           const next = [...prev];
           next[LOSS_STREAM] = { progress: 100, stalled: false, done: true };
           return next;
         });
-      }, 2400);
+      }, 700 + stallMs + 400);
       schedule(() => {
         setRunning(false);
         setPhaseNote(
           "HTTP/3 lesson: QUIC stream independence avoids TCP HOL. Page feels faster under loss even with the same multiplexing."
         );
-      }, 2600);
+      }, 700 + stallMs + 600);
     }
-  }, [running, mode, packetLoss]);
+  }, [running, mode, packetLoss, lossSeverity]);
 
   function start() {
     clearTimers();
@@ -267,19 +272,38 @@ export function MultiplexSimulator() {
       </div>
 
       {(mode === "h2" || mode === "h3") && (
-        <label className="mb-3 flex items-center gap-2 text-xs">
-          <input
-            type="checkbox"
-            checked={packetLoss}
-            disabled={running}
-            onChange={(e) => {
-              setPacketLoss(e.target.checked);
-              setStreams(emptyStreams());
-              setPhaseNote("");
-            }}
-          />
-          Simulate packet loss (shows H2 vs H3 difference)
-        </label>
+        <div className="mb-3 flex flex-wrap items-center gap-3 text-xs">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={packetLoss}
+              disabled={running}
+              onChange={(e) => {
+                setPacketLoss(e.target.checked);
+                setStreams(emptyStreams());
+                setPhaseNote("");
+              }}
+            />
+            Simulate packet loss (shows H2 vs H3 difference)
+          </label>
+          {packetLoss && (
+            <label className="flex items-center gap-1">
+              Severity
+              <select
+                className="rounded border border-[var(--border)] px-1 py-0.5"
+                disabled={running}
+                value={lossSeverity}
+                onChange={(e) =>
+                  setLossSeverity(e.target.value as "light" | "medium" | "heavy")
+                }
+              >
+                <option value="light">Light</option>
+                <option value="medium">Medium</option>
+                <option value="heavy">Heavy</option>
+              </select>
+            </label>
+          )}
+        </div>
       )}
 
       {phaseNote && (

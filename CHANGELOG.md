@@ -12,6 +12,24 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.6.0] — 2026-08-25
+
+### Added
+
+#### High-impact UX / labs
+- **Cookie jar** (optional) — store `Set-Cookie` in `sessionStorage`; inject `Cookie` on later Sends; apply across Follow-redirect hops when enabled
+- **Try this checklists** — guided steps under the lab/preset explainer (checkboxes + why)
+- **Composed vs Actually sent** — Wire-tab header diff after Send
+- **UI prefs persistence** — accordion open state, last curriculum + preset id (`localStorage`)
+
+#### Teaching depth
+- **Multiplex loss severity** — Light / Medium / Heavy stall duration for H2 vs H3 HOL demo
+- **Lab: CL + TE (encode only)** — ambiguous Content-Length + Transfer-Encoding teaching encode (do not Send to untrusted targets)
+- **TLS handshake timeline** — ClientHello → ALPN sketch next to live TLS panel
+- **HTTP/2 stream priority sketch** — conceptual dependency tree + RFC 9218 links
+
+---
+
 ## [0.5.1] — 2026-08-25
 
 ### Added

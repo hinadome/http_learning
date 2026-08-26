@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CURRICULA } from "@/lib/learn/curriculum";
 import { PRESETS } from "@/lib/learn/presets";
+import { loadUiPrefs, saveUiPrefs } from "@/lib/learn/ui-prefs";
 import type { ComposedRequest } from "@/lib/types";
 
 interface Props {
@@ -11,6 +12,13 @@ interface Props {
 
 export function CurriculumPanel({ onLoadPreset }: Props) {
   const [activeId, setActiveId] = useState(CURRICULA[0]?.id ?? "");
+
+  useEffect(() => {
+    const prefs = loadUiPrefs();
+    if (prefs.curriculumId && CURRICULA.some((c) => c.id === prefs.curriculumId)) {
+      setActiveId(prefs.curriculumId);
+    }
+  }, []);
 
   const curriculum = CURRICULA.find((c) => c.id === activeId) ?? CURRICULA[0];
 
@@ -31,7 +39,12 @@ export function CurriculumPanel({ onLoadPreset }: Props) {
       <select
         className="mb-3 w-full rounded border border-[var(--border)] px-2 py-1 text-xs"
         value={activeId}
-        onChange={(e) => setActiveId(e.target.value)}
+        onChange={(e) => {
+          const id = e.target.value;
+          setActiveId(id);
+          const prefs = loadUiPrefs();
+          saveUiPrefs({ ...prefs, curriculumId: id });
+        }}
       >
         {CURRICULA.map((c) => (
           <option key={c.id} value={c.id}>

@@ -35,6 +35,7 @@ npm start
 | Intercept-style debugging | Session traffic log, rewrite rules, mock breakpoints, HAR export |
 | Deeper protocol labs | Multiplex simulator, H2 trailers/push encode, TLS panel, curriculum, dark mode |
 | Multi-protocol Send | GraphQL, WebSocket relay, SSE, gRPC gateway, MQTT bridge + protocol explain panel |
+| Cookie & wire teaching | Optional cookie jar; composed vs sent header diff; CL+TE encode-only lab |
 
 This is an **educational client**, not a production API tester.
 
@@ -469,14 +470,19 @@ http_checker/
 - **Mock server** — match rules on Send without network  
 - **Rewrite rules** — inject request headers / replace response body on live Send (Validate uses same inject)  
 - **Session traffic log** — intercept-style log of app Sends; click row for detail  
+- **Cookie jar** — optional; store Set-Cookie and replay Cookie on later Sends / redirect hops  
 - **Mock breakpoints** — pause on mock match, edit response before display  
 - **MITM & capture guides** — teaching panels (no system CA / no live qvis)  
 - **CI export** — Postman collection JSON + bash curl script from collections  
+- **Wire teaching** — composed vs actually sent header diff after Send  
+- **TLS handshake timeline** + **H2 priority sketch** — conceptual teaching panels  
 
 ### Labs worth knowing
-- **Set-Cookie** — Send **without** Follow redirects to see `302` + `Set-Cookie`. Follow redirects → final `/cookies` body is often `{"cookies":{}}` because this Node proxy has no cookie jar.  
+- **Set-Cookie** — Send **without** Follow redirects to see `302` + `Set-Cookie`. Enable **Cookie jar** + Follow redirects to see cookies applied on the next hop (body may then list cookies). Without a jar, `{"cookies":{}}` is expected.  
 - **WebSocket** — URL `wss://…` + Protocol WebSocket; headers in the editor are not sent by the relay (URL + outbound message only). Status **101** in the UI is a teaching wrapper; the body is live frames from the server.  
 - **GraphQL** — selecting Protocol GraphQL sets Body type to GraphQL query and Method POST.  
+- **CL + TE** — Encode-only lab for request-smuggling ambiguity; do not Send against systems you do not own.  
+- **Multiplex simulator** — with packet loss + severity, compare H2 (stall all) vs H3 (stream-local).  
 
 ## Browser storage (`localStorage`)
 
@@ -489,12 +495,14 @@ http_checker/
 | `http-learning-checker-active-env` | Selected environment id |
 | `http-learning-checker-mocks` | Mock response rules |
 | `http-learning-checker-rewrites` | Rewrite rules (request inject / response replace) |
+| `http-learning-checker-ui-prefs` | Accordion open state, curriculum / preset ids |
 
 **Session storage** (`sessionStorage`):
 
 | Key | Contents |
 |-----|----------|
 | `http-learning-checker-traffic-session` | Session traffic log (last 100 Sends in tab) |
+| `http-learning-checker-cookie-jar` | Optional educational cookie jar |
 
 ## History storage
 
@@ -530,7 +538,9 @@ http_checker/
 14. **WebSocket echo** preset → Send → Response shows live frames (101 is a UI wrapper).  
 15. **Lab: Set-Cookie** → Follow redirects **off** → see `Set-Cookie` on 302.  
 16. **Multiplex simulator** (HTTP/2 or 3) → enable packet loss → compare H2 stall-all vs H3 stream-local.  
-17. See [ROADMAP.md](./ROADMAP.md) Phase 1–4 review checklists.  
+17. **Cookie jar** + Set-Cookie lab → Follow redirects on → cookies applied on next hop.  
+18. **Lab: CL + TE** → Encode only → read smuggling notes.  
+19. See [ROADMAP.md](./ROADMAP.md) Phase 1–4 review checklists.  
 
 ## Stack
 
@@ -544,7 +554,7 @@ http_checker/
 
 ## Roadmap
 
-See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1–4** are complete. Current release: **v0.5.1**. See [CHANGELOG.md](./CHANGELOG.md).
+See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1–4** are complete. Current release: **v0.6.0**. See [CHANGELOG.md](./CHANGELOG.md).
 
 ## License
 

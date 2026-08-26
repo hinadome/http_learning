@@ -107,3 +107,9 @@ Feature gaps vs similar tools ([How HTTP Works](https://howhttpworks.com/tools),
 6. **Learning paths** — Curriculum panel → Load preset per step
 7. **Lifecycle animation** — Validate / Send → phase highlights update
 8. **CONNECT lesson** — read ConnectLesson panel
+9. **Cookie jar** — Set-Cookie lab + jar on + Follow redirects → Cookie on next hop
+10. **Try this** — lab preset → checklist under explainer
+11. **Wire diff** — after Send → Composed vs Actually sent on Wire tab
+12. **CL + TE lab** — Encode only → smuggling notes (do not Send to untrusted hosts)
+13. **Loss severity** — Multiplex → Medium/Heavy + packet loss → longer H2 stall
+14. **TLS timeline / H2 priority** — teaching panels under TLS / H2–3 accordion

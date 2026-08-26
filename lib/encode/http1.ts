@@ -140,6 +140,58 @@ export function encodeHttp1Chunked(req: ComposedRequest): EncodeResult {
   };
 }
 
+/**
+ * Educational-only: request with both Content-Length and Transfer-Encoding.
+ * Do not Send this to arbitrary targets — Encode to study ambiguity / smuggling risk.
+ */
+export function encodeHttp1ClTeSmuggle(req: ComposedRequest): EncodeResult {
+  const parsed = parseComposedRequest(req);
+  const body = parsed.body || "smuggle-demo";
+  const headerLines = [
+    `Host: ${parsed.target.hostname}`,
+    "Transfer-Encoding: chunked",
+    `Content-Length: ${Buffer.byteLength(body, "utf8")}`,
+    "Content-Type: text/plain",
+  ];
+  const requestLine = `POST ${parsed.pathWithQuery || "/"} HTTP/1.1`;
+  const textWire =
+    requestLine + "\r\n" + headerLines.join("\r\n") + "\r\n\r\n" + body;
+  const buf = Buffer.from(textWire, "utf8");
+
+  return {
+    version: "1.1",
+    textWire,
+    textWireHex: bufferToHex(buf),
+    frames: [
+      {
+        name: "Ambiguous CL + TE message",
+        type: "TEXT",
+        hex: bufferToHex(buf),
+        asciiPreview: bufferToAsciiPreview(buf.slice(0, 200)),
+        annotations: [
+          {
+            offset: textWire.indexOf("Transfer-Encoding"),
+            length: "Transfer-Encoding: chunked".length,
+            label: "Transfer-Encoding",
+          },
+          {
+            offset: textWire.indexOf("Content-Length"),
+            length: `Content-Length: ${Buffer.byteLength(body, "utf8")}`.length,
+            label: "Content-Length",
+          },
+        ],
+        explanation:
+          "Both framing headers present. Front-ends and origins may disagree which wins — the root of classic request smuggling.",
+      },
+    ],
+    notes: [
+      "ENCODE-ONLY teaching lab. Validation treats CL+TE as an error; do not Send to production systems.",
+      "RFC 9112: a sender must not generate a message with both Content-Length and Transfer-Encoding.",
+      "Study smuggling conceptually; never use this pattern to attack systems you do not own.",
+    ],
+  };
+}
+
 /** Build wire message used when actually sending (may inject Host / Content-Length). */
 export function buildHttp1WireForSend(
   req: ComposedRequest,

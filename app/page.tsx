@@ -37,6 +37,14 @@ import { saveCollections, loadCollections } from "@/lib/learn/collections";
 import { parseShareFromHash } from "@/lib/learn/share";
 import { prepareRequestForSend } from "@/lib/request/prepare";
 import {
+  cookieHeaderForUrl,
+  ingestSetCookieHeaders,
+  upsertCookieHeader,
+} from "@/lib/learn/cookie-jar";
+import { loadUiPrefs, saveUiPrefs } from "@/lib/learn/ui-prefs";
+import { TlsHandshakeTimeline } from "@/components/TlsHandshakeTimeline";
+import { StreamPrioritySketch } from "@/components/StreamPrioritySketch";
+import {
   DEFAULT_REQUEST,
   mergePresetRequest,
 } from "@/lib/learn/default-request";
@@ -106,6 +114,10 @@ export default function HomePage() {
     setLog(null);
     setCompare(null);
     setActivePresetId(presetId ?? null);
+    if (presetId) {
+      const prefs = loadUiPrefs();
+      saveUiPrefs({ ...prefs, activePresetId: presetId });
+    }
   }
 
   useEffect(() => {
@@ -113,6 +125,8 @@ export default function HomePage() {
     setEnvironments(loadEnvironments());
     setActiveEnvId(loadActiveEnvId());
     setTraffic(loadTrafficSession());
+    const prefs = loadUiPrefs();
+    if (prefs.activePresetId) setActivePresetId(prefs.activePresetId);
     fetch("/api/http3-support")
       .then((r) => r.json())
       .then(setHttp3Support)
@@ -243,14 +257,25 @@ export default function HomePage() {
   ) {
     setBusy("send");
     setCompare(null);
+    let prepared = loadRequest(resolvedRequest);
+    if (request.useCookieJar) {
+      const cookie = cookieHeaderForUrl(prepared.url);
+      if (cookie) {
+        prepared = {
+          ...prepared,
+          headerText: upsertCookieHeader(prepared.headerText, cookie),
+        };
+      }
+    }
     const payload = {
-      ...loadRequest(resolvedRequest),
+      ...prepared,
       protocol: request.protocol ?? "http",
       wsOutboundMessage: request.wsOutboundMessage,
       mqttTopic: request.mqttTopic,
       assertions: request.assertions,
       useMock: request.useMock,
       mockRuleId: request.mockRuleId,
+      useCookieJar: request.useCookieJar,
       breakpointResume,
     };
     try {
@@ -274,6 +299,20 @@ export default function HomePage() {
       }
 
       setBreakpointPending(null);
+      if (request.useCookieJar && data.response) {
+        const setCookie =
+          data.response.headers["set-cookie"] ??
+          data.response.headers["Set-Cookie"];
+        ingestSetCookieHeaders(
+          setCookie,
+          data.finalUrl ?? payload.url
+        );
+        for (const hop of data.redirectChain ?? []) {
+          if (hop.setCookie) {
+            ingestSetCookieHeaders(hop.setCookie, hop.url);
+          }
+        }
+      }
       setHistory(
         pushHistory(
           request,
@@ -420,6 +459,7 @@ export default function HomePage() {
           <ValidationPanel result={validation} />
 
           <AccordionSection
+            id="client-tools"
             title="Client tools"
             summary="Environments, collections, assertions, history"
           >
@@ -477,6 +517,7 @@ export default function HomePage() {
           </AccordionSection>
 
           <AccordionSection
+            id="intercept-tools"
             title="Intercept tools"
             summary="Mock, rewrite, session traffic"
           >
@@ -489,6 +530,7 @@ export default function HomePage() {
           </AccordionSection>
 
           <AccordionSection
+            id="learn-tools"
             title="Learn"
             summary="Curriculum, version docs, glossary"
           >
@@ -516,6 +558,7 @@ export default function HomePage() {
             tab={tab}
             onTab={setTab}
             requestUrl={resolvedRequest.url}
+            composedHeaderText={resolvedRequest.headerText}
           />
 
           <LifecycleAnimation
@@ -524,20 +567,26 @@ export default function HomePage() {
           />
 
           {log?.tlsInfo && <TlsPanel tls={log.tlsInfo} />}
+          {(request.version === "2" ||
+            request.version === "1.1" ||
+            Boolean(log?.tlsInfo)) && <TlsHandshakeTimeline />}
 
           {showH2H3Lesson && (
             <AccordionSection
+              id="h2h3-lessons"
               title="HTTP/2–3 lessons"
-              summary="Compression, multiplexing"
+              summary="Compression, multiplexing, priorities"
               defaultOpen
             >
               <CompressionLesson />
               <MultiplexLesson />
               <MultiplexSimulator />
+              <StreamPrioritySketch />
             </AccordionSection>
           )}
 
           <AccordionSection
+            id="more-lessons"
             title="More lessons"
             summary="MITM, CONNECT, packet capture"
           >
