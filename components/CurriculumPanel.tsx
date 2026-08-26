@@ -6,7 +6,7 @@ import { PRESETS } from "@/lib/learn/presets";
 import type { ComposedRequest } from "@/lib/types";
 
 interface Props {
-  onLoadPreset: (req: ComposedRequest) => void;
+  onLoadPreset: (req: ComposedRequest, presetId?: string) => void;
 }
 
 export function CurriculumPanel({ onLoadPreset }: Props) {
@@ -17,7 +17,7 @@ export function CurriculumPanel({ onLoadPreset }: Props) {
   function loadStep(presetId?: string) {
     if (!presetId) return;
     const preset = PRESETS.find((p) => p.id === presetId);
-    if (preset) onLoadPreset({ ...preset.request });
+    if (preset) onLoadPreset({ ...preset.request }, preset.id);
   }
 
   if (!curriculum) return null;

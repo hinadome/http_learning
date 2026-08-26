@@ -86,6 +86,7 @@ export default function HomePage() {
   const [traffic, setTraffic] = useState<TrafficEntry[]>([]);
   const [breakpointPending, setBreakpointPending] =
     useState<BreakpointPending | null>(null);
+  const [activePresetId, setActivePresetId] = useState<string | null>(null);
   const [showSafety, setShowSafety] = useState(false);
 
   const resolvedRequest = useMemo(() => {
@@ -99,11 +100,12 @@ export default function HomePage() {
     return prepared;
   }, []);
 
-  function loadPreset(req: ComposedRequest) {
+  function loadPreset(req: ComposedRequest, presetId?: string) {
     setRequest(mergePresetRequest(req));
     setValidation(null);
     setLog(null);
     setCompare(null);
+    setActivePresetId(presetId ?? null);
   }
 
   useEffect(() => {
@@ -354,7 +356,10 @@ export default function HomePage() {
       </header>
 
       <div className="flex flex-wrap items-end gap-3">
-        <PresetSelect onLoad={loadPreset} />
+        <PresetSelect
+          selectedId={activePresetId}
+          onSelect={(id, req) => loadPreset(req, id)}
+        />
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
@@ -434,6 +439,7 @@ export default function HomePage() {
                   setRequest(mergePresetRequest(req));
                   setValidation(null);
                   setLog(null);
+                  setActivePresetId(null);
                 }}
               />
             </div>
@@ -456,7 +462,10 @@ export default function HomePage() {
                       <button
                         type="button"
                         className="w-full rounded border border-[var(--border)] px-2 py-1 text-left hover:border-[var(--accent)]"
-                        onClick={() => setRequest(mergePresetRequest(h.request))}
+                        onClick={() => {
+                          setRequest(mergePresetRequest(h.request));
+                          setActivePresetId(null);
+                        }}
                       >
                         {h.summary}
                       </button>

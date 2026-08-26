@@ -12,6 +12,15 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.5.1] — 2026-08-25
+
+### Added
+- **Protocol explain “Read more” links** — MDN / RFC / spec URLs per protocol (HTTP, GraphQL, SSE, gRPC, WebSocket, MQTT)
+- **Lab / preset explanation** — selected lab title + description under the preset selector
+- **Multiplex simulator: H2 vs H3 under loss** — optional packet-loss mode; H2 stalls all streams (TCP HOL), H3 stalls only the affected QUIC stream
+
+---
+
 ## [0.5.0] — 2026-08-25
 
 ### Changed

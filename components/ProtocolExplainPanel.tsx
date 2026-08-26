@@ -2,6 +2,7 @@
 
 import type { RequestProtocol } from "@/lib/types";
 import { getProtocolHelp } from "@/lib/learn/protocol-help";
+import { DocLinks } from "./DocLinks";
 
 interface Props {
   protocol: RequestProtocol | undefined;
@@ -39,6 +40,12 @@ export function ProtocolExplainPanel({ protocol }: Props) {
           URL example: <span className="font-mono">{help.urlHint}</span>
         </p>
       )}
+      <div className="mt-2 border-t border-[var(--accent-border)]/50 pt-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+          Read more
+        </p>
+        <DocLinks docs={help.docs} />
+      </div>
     </div>
   );
 }

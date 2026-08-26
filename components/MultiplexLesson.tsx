@@ -45,9 +45,10 @@ export function MultiplexLesson() {
         </div>
       </div>
       <p className="mt-3 text-xs text-[var(--muted)]">
-        Use <strong>Compare 1.1 vs 2</strong>, <strong>1.1 vs 3</strong>, or{" "}
-        <strong>2 vs 3</strong> in this app to see wire differences; Send to
-        observe negotiated protocol and Alt-Svc on H3 targets.
+        Use the <strong>Multiplex load simulator</strong> with{" "}
+        <strong>Simulate packet loss</strong> on — under ideal networks H2 and H3
+        look alike; under loss, H2 freezes every stream while H3 keeps the others
+        moving. Also try <strong>Compare 2 vs 3</strong> for wire/frame differences.
       </p>
       <DocLinks
         docs={[

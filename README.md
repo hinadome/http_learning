@@ -529,7 +529,8 @@ http_checker/
 13. **Session traffic** + **Copy HAR** after Send (click a traffic row for detail).  
 14. **WebSocket echo** preset → Send → Response shows live frames (101 is a UI wrapper).  
 15. **Lab: Set-Cookie** → Follow redirects **off** → see `Set-Cookie` on 302.  
-16. See [ROADMAP.md](./ROADMAP.md) Phase 1–4 review checklists.  
+16. **Multiplex simulator** (HTTP/2 or 3) → enable packet loss → compare H2 stall-all vs H3 stream-local.  
+17. See [ROADMAP.md](./ROADMAP.md) Phase 1–4 review checklists.  
 
 ## Stack
 
@@ -543,7 +544,7 @@ http_checker/
 
 ## Roadmap
 
-See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1–4** are complete. Current release: **v0.5.0** (UI declutter). See [CHANGELOG.md](./CHANGELOG.md).
+See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1–4** are complete. Current release: **v0.5.1**. See [CHANGELOG.md](./CHANGELOG.md).
 
 ## License
 
