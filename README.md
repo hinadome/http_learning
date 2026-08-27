@@ -20,6 +20,42 @@ npm start
 
 > Live HTTP/3 uses `@currentspace/http3` (bundled). Encode/QPACK views work even if a given target rejects QUIC.
 
+## Deploy
+
+This is a **Next.js** App Router app (Node.js API routes). It is not a static site — Validate / Encode / Send need a server runtime.
+
+| Platform | Config | Notes |
+|----------|--------|--------|
+| **Vercel** | [`vercel.json`](./vercel.json) | Framework `nextjs`; import the Git repo or `npx vercel` |
+| **Netlify** | [`netlify.toml`](./netlify.toml) + `@netlify/plugin-nextjs` | OpenNext adapter; Node 20 |
+
+### Vercel
+
+1. Push the repo and [Import](https://vercel.com/new) the project (or `npx vercel`).
+2. Framework Preset: **Next.js** (auto from `vercel.json`).
+3. Build: `npm run build` · Install: `npm ci` · Node 20+.
+
+`/api/send`, `/api/ws`, and `/api/mqtt` set `maxDuration = 60` (requires a plan that allows it; Hobby may cap lower).
+
+### Netlify
+
+1. [Add a new site](https://app.netlify.com/) from Git, or `npx netlify deploy --build`.
+2. Build command and publish dir come from `netlify.toml` (`npm run build`, publish `.next`).
+3. The `@netlify/plugin-nextjs` plugin adapts the App Router for Netlify Functions.
+
+### Serverless limits (both)
+
+- **Timeouts** — long Sends, WebSocket relay, and MQTT can hit platform caps; Prefer Pro/higher limits for demos.
+- **HTTP/3** — `@currentspace/http3` may work when the function environment supports it; `curl --http3` fallback is usually **unavailable** on serverless. Encode/QPACK still works without live H3.
+- **Outbound proxy** — this app opens connections to URLs you enter. Deploy only for trusted users; SSRF guards apply, but public open proxies invite abuse.
+- Prefer **Node** runtime (already set on all `/api/*` routes) — not Edge.
+
+Local production check:
+
+```bash
+npm run build && npm start
+```
+
 ## Purpose
 
 | Goal | How the app helps |

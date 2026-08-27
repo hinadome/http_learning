@@ -1,0 +1,13 @@
+# Netlify — Next.js App Router (OpenNext adapter)
+# https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Runtime installs automatically for Next.js; listed for explicit/reproducible builds.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

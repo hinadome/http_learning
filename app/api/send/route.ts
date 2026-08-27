@@ -3,6 +3,8 @@ import { executeRequest } from "@/lib/clients";
 import type { ComposedRequest, MockRule, RewriteRule } from "@/lib/types";
 
 export const runtime = "nodejs";
+/** Outbound Send / redirect hops — allow longer than default serverless limit when plan supports it. */
+export const maxDuration = 60;
 
 interface SendBody extends ComposedRequest {
   mockRules?: MockRule[];

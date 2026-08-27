@@ -8,7 +8,8 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
-- (none)
+### Added
+- **Vercel & Netlify deploy** — `vercel.json`, `netlify.toml`, `@netlify/plugin-nextjs`, Node `engines >=20`, API `maxDuration` for Send/WS/MQTT; README Deploy section
 
 ---
 
