@@ -160,7 +160,7 @@ export interface ComposedRequest {
   maxRedirects?: number;
   /** Educational cookie jar: store Set-Cookie and send Cookie on later requests / redirect hops. */
   useCookieJar?: boolean;
-  /** Multi-protocol mode (default http). */
+  /** Application / teaching mode (default http). Value `sse` is HTTP with SSE Accept — labeled “HTTP / SSE” in the UI. */
   protocol?: RequestProtocol;
   bodyType?: BodyType;
   /** GraphQL variables JSON object string. */
@@ -254,6 +254,8 @@ export interface RedirectHop {
   location: string;
   /** Set-Cookie from this hop (before following Location). */
   setCookie?: string | string[];
+  /** Cookie header value sent on the *next* hop after this one (jar). */
+  cookieSentNext?: string;
 }
 
 export interface SendResponse {

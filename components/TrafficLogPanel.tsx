@@ -134,7 +134,7 @@ export function TrafficLogPanel({ entries, onSelect, onClear }: Props) {
           className="text-xs text-[var(--muted)] hover:text-[var(--danger)]"
           onClick={handleClear}
         >
-          Clear
+          Clear session traffic
         </button>
       </div>
       <p className="mb-2 text-xs text-[var(--muted)]">

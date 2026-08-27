@@ -1,10 +1,19 @@
-import type { ComposedRequest, HttpVersion } from "../types";
+import type { ComposedRequest, HttpVersion, RequestAssertion } from "../types";
 
 export interface Preset {
   id: string;
   title: string;
   description: string;
   request: ComposedRequest;
+}
+
+function assertion(
+  id: string,
+  kind: RequestAssertion["kind"],
+  expected: string,
+  target?: string
+): RequestAssertion {
+  return { id, kind, expected, target };
 }
 
 function base(
@@ -27,6 +36,7 @@ function base(
     graphqlVariables: partial.graphqlVariables ?? "{}",
     multipartFields: partial.multipartFields ?? [],
     encodeLab: partial.encodeLab,
+    assertions: partial.assertions ?? [],
   };
 }
 
@@ -227,7 +237,7 @@ Accept: */*`,
     id: "redirect-302",
     title: "Lab: Redirect (302)",
     description:
-      "httpbin /redirect/2 — Send without follow to see 302 + Location; enable Follow redirects to see chain.",
+      "httpbin /redirect/2 — Send without follow to see 302 + Location; enable Follow redirects to see hop timeline. Ships with status assertion.",
     request: base({
       version: "1.1",
       method: "GET",
@@ -236,13 +246,14 @@ Accept: */*`,
 Accept: application/json
 User-Agent: HTTP-Learning-Checker/1.0`,
       followRedirects: false,
+      assertions: [assertion("as-redirect-status", "status", "302")],
     }),
   },
   {
     id: "set-cookie-response",
     title: "Lab: Set-Cookie response",
     description:
-      "httpbin /cookies/set — Send without follow redirects to see 302 + Set-Cookie on Response. (Follow redirects shows empty cookies — Node has no cookie jar.)",
+      "httpbin /cookies/set — Follow redirects off to see 302 + Set-Cookie. Enable Cookie jar + Follow redirects to apply cookies on the next hop.",
     request: base({
       version: "1.1",
       method: "GET",
@@ -251,6 +262,143 @@ User-Agent: HTTP-Learning-Checker/1.0`,
 Accept: application/json
 User-Agent: HTTP-Learning-Checker/1.0`,
       followRedirects: false,
+      assertions: [
+        assertion("as-setcookie-status", "status", "302"),
+        assertion("as-setcookie-hdr", "header", "session", "set-cookie"),
+      ],
+    }),
+  },
+  {
+    id: "range-206",
+    title: "Lab: Range (206)",
+    description:
+      "Range: bytes=0-99 against httpbin /range/1024 — expect 206 + Content-Range.",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://httpbin.org/range/1024",
+      headerText: `Host: httpbin.org
+Range: bytes=0-99
+Accept: */*
+User-Agent: HTTP-Learning-Checker/1.0`,
+      assertions: [
+        assertion("as-range-status", "status", "206"),
+        assertion("as-range-cr", "header", "bytes", "content-range"),
+      ],
+    }),
+  },
+  {
+    id: "conditional-304",
+    title: "Lab: Conditional GET (304)",
+    description:
+      "If-None-Match against httpbin /etag — 304 when the ETag matches. (If-Modified-Since is a separate lab: /etag does not evaluate it.)",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://httpbin.org/etag/abc123",
+      headerText: `Host: httpbin.org
+If-None-Match: "abc123"
+Accept: */*
+User-Agent: HTTP-Learning-Checker/1.0`,
+      assertions: [assertion("as-cond-status", "status", "304")],
+    }),
+  },
+  {
+    id: "conditional-304-ims",
+    title: "Lab: If-Modified-Since (304)",
+    description:
+      "If-Modified-Since against httpbin /cache — 304 when the header is present (clock-based validator; weaker than ETag).",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://httpbin.org/cache",
+      headerText: `Host: httpbin.org
+If-Modified-Since: Wed, 21 Oct 2015 07:28:00 GMT
+Accept: */*
+User-Agent: HTTP-Learning-Checker/1.0`,
+      assertions: [assertion("as-ims-status", "status", "304")],
+    }),
+  },
+  {
+    id: "cache-control",
+    title: "Lab: Cache-Control",
+    description:
+      "httpbin /cache/60 — Cache-Control, Date, Age/Expires when present; Response panel shows freshness precedence (max-age vs Expires vs Age).",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://httpbin.org/cache/60",
+      headerText: `Host: httpbin.org
+Accept: application/json
+User-Agent: HTTP-Learning-Checker/1.0`,
+      assertions: [
+        assertion("as-cache-status", "status", "200"),
+        assertion("as-cache-cc", "header", "max-age", "cache-control"),
+      ],
+    }),
+  },
+  {
+    id: "cache-precedence",
+    title: "Lab: Age / Expires precedence",
+    description:
+      "Injects Cache-Control max-age, Expires, and Age together — Response panel shows which freshness signal wins.",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://httpbin.org/response-headers?Cache-Control=max-age%3D120&Expires=Thu%2C%2001%20Jan%202030%2000%3A00%3A00%20GMT&Age=30",
+      headerText: `Host: httpbin.org
+Accept: application/json
+User-Agent: HTTP-Learning-Checker/1.0`,
+      assertions: [
+        assertion("as-prec-cc", "header", "max-age", "cache-control"),
+        assertion("as-prec-age", "header", "30", "age"),
+        assertion("as-prec-exp", "header", "2030", "expires"),
+      ],
+    }),
+  },
+  {
+    id: "hsts-header",
+    title: "Lab: HSTS header",
+    description:
+      "httpbin injects Strict-Transport-Security via query — observe HSTS teaching on Response.",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://httpbin.org/response-headers?Strict-Transport-Security=max-age%3D31536000%3B%20includeSubDomains",
+      headerText: `Host: httpbin.org
+Accept: application/json
+User-Agent: HTTP-Learning-Checker/1.0`,
+      assertions: [
+        assertion(
+          "as-hsts-hdr",
+          "header",
+          "max-age",
+          "strict-transport-security"
+        ),
+      ],
+    }),
+  },
+  {
+    id: "cors-headers",
+    title: "Lab: CORS headers",
+    description:
+      "Access-Control-Allow-* via httpbin — compare with CORS teaching panel (browser vs Node proxy).",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://httpbin.org/response-headers?Access-Control-Allow-Origin=*&Access-Control-Allow-Methods=GET%2CPOST",
+      headerText: `Host: httpbin.org
+Accept: application/json
+Origin: https://example.com
+User-Agent: HTTP-Learning-Checker/1.0`,
+      assertions: [
+        assertion(
+          "as-cors-acao",
+          "header",
+          "*",
+          "access-control-allow-origin"
+        ),
+      ],
     }),
   },
   {

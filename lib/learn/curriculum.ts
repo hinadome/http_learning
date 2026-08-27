@@ -34,8 +34,55 @@ export const CURRICULA: Curriculum[] = [
       },
       {
         title: "Redirect chain",
-        description: "Toggle Follow redirects and compare Response tab.",
+        description: "Toggle Follow redirects and compare hop timeline.",
         presetId: "redirect-302",
+      },
+      {
+        title: "Range / 206",
+        description: "Partial content with Range header.",
+        presetId: "range-206",
+      },
+      {
+        title: "Conditional GET (ETag)",
+        description: "If-None-Match → 304 Not Modified.",
+        presetId: "conditional-304",
+      },
+      {
+        title: "If-Modified-Since",
+        description: "Last-Modified-based 304 on /cache.",
+        presetId: "conditional-304-ims",
+      },
+    ],
+  },
+  {
+    id: "cookies-cors-security",
+    title: "Cookies, CORS & security headers",
+    description: "Set-Cookie jar, CORS vs proxy, HSTS and cache.",
+    steps: [
+      {
+        title: "Set-Cookie + jar",
+        description: "302 Set-Cookie, then jar + follow redirects.",
+        presetId: "set-cookie-response",
+      },
+      {
+        title: "CORS headers",
+        description: "Observe ACAO; read CORS teaching panel.",
+        presetId: "cors-headers",
+      },
+      {
+        title: "HSTS",
+        description: "Strict-Transport-Security on Response.",
+        presetId: "hsts-header",
+      },
+      {
+        title: "Cache-Control",
+        description: "Cache directives from httpbin /cache/60.",
+        presetId: "cache-control",
+      },
+      {
+        title: "Age / Expires precedence",
+        description: "max-age vs Expires vs Age on one response.",
+        presetId: "cache-precedence",
       },
     ],
   },

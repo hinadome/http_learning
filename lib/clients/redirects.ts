@@ -31,7 +31,16 @@ export function buildRedirectHop(
   status: number,
   statusText: string,
   location: string,
-  setCookie?: string | string[]
+  setCookie?: string | string[],
+  cookieSentNext?: string
 ): RedirectHop {
-  return { hop, url, status, statusText, location, setCookie };
+  return {
+    hop,
+    url,
+    status,
+    statusText,
+    location,
+    setCookie,
+    cookieSentNext,
+  };
 }

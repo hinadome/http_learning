@@ -152,7 +152,7 @@ export function RequestEditor({ value, onChange, onImportCollection }: Props) {
                 <option value="http">HTTP / REST</option>
                 <option value="graphql">GraphQL</option>
                 <option value="websocket">WebSocket</option>
-                <option value="sse">SSE</option>
+                <option value="sse">HTTP / SSE</option>
                 <option value="grpc">gRPC (gateway)</option>
                 <option value="mqtt">MQTT (bridge)</option>
               </select>

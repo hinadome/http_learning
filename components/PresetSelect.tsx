@@ -55,6 +55,15 @@ export function PresetSelect({ selectedId, onSelect }: Props) {
               <strong className="text-[var(--fg)]">Why:</strong> {guide.why}
             </p>
           )}
+          {guide?.explain && guide.explain.length > 0 && (
+            <ul className="mt-2 list-inside list-disc text-xs text-[var(--muted)]">
+              {guide.explain.map((line, i) => (
+                <li key={i} className="leading-relaxed">
+                  {line}
+                </li>
+              ))}
+            </ul>
+          )}
           {guide && guide.steps.length > 0 && (
             <div className="mt-3">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">

@@ -34,8 +34,9 @@ npm start
 | Test without the network | Mock rules; post-response assertions |
 | Intercept-style debugging | Session traffic log, rewrite rules, mock breakpoints, HAR export |
 | Deeper protocol labs | Multiplex simulator, H2 trailers/push encode, TLS panel, curriculum, dark mode |
-| Multi-protocol Send | GraphQL, WebSocket relay, SSE, gRPC gateway, MQTT bridge + protocol explain panel |
-| Cookie & wire teaching | Optional cookie jar; composed vs sent header diff; CL+TE encode-only lab |
+| Multi-protocol Send | GraphQL, WebSocket relay, HTTP / SSE, gRPC gateway, MQTT bridge + protocol explain panel |
+| Cookie & wire teaching | Optional cookie jar + inspector; composed vs sent; What changed; CL+TE lab |
+| Cache / CORS / Range | Conditional 304, Range 206, HSTS, CORS labs + teaching panels |
 
 This is an **educational client**, not a production API tester.
 
@@ -444,7 +445,8 @@ http_checker/
 ### HTTP learning (core)
 - Line-by-line header editor + body (text, JSON, GraphQL, multipart)  
 - HTTP version selector (1.0 / 1.1 / 2 / 3)  
-- **Protocol** selector: HTTP, GraphQL, WebSocket, SSE, gRPC (gateway), MQTT (bridge)  
+- **Protocol** selector: HTTP, GraphQL, WebSocket, **HTTP / SSE**, gRPC (gateway), MQTT (bridge)  
+  - **HTTP / SSE** is still HTTP on the wire (`Accept: text/event-stream`); not a separate application protocol like WebSocket or MQTT  
 - Expanded **pseudo-header vs request-line** explanation for HTTP/2 and HTTP/3  
 - Validate, Encode, Compare (1.1/2/3 pairs), Send  
 - **Duplicate header warnings** with version-specific messages and panel callout  
@@ -466,22 +468,26 @@ http_checker/
 - **Collections / folders** — save and reload requests  
 - **Environments** — `{{variable}}` substitution before Validate/Send  
 - **Assertions** — post-response checks (status, header contains, body contains)  
-- **Protocol selector** — HTTP, GraphQL (auto body type), WebSocket, SSE, gRPC gateway, MQTT; explain panel on change  
+- **Protocol selector** — HTTP, GraphQL (auto body type), WebSocket, HTTP / SSE, gRPC gateway, MQTT; explain panel on change  
 - **Mock server** — match rules on Send without network  
 - **Rewrite rules** — inject request headers / replace response body on live Send (Validate uses same inject)  
 - **Session traffic log** — intercept-style log of app Sends; click row for detail  
-- **Cookie jar** — optional; store Set-Cookie and replay Cookie on later Sends / redirect hops  
+- **Cookie jar** — optional; store Set-Cookie and replay Cookie; **inspector** to edit / clear / export to editor  
 - **Mock breakpoints** — pause on mock match, edit response before display  
 - **MITM & capture guides** — teaching panels (no system CA / no live qvis)  
 - **CI export** — Postman collection JSON + bash curl script from collections  
-- **Wire teaching** — composed vs actually sent header diff after Send  
-- **TLS handshake timeline** + **H2 priority sketch** — conceptual teaching panels  
+- **Wire teaching** — composed vs actually sent header diff; **What changed** callout after Send  
+- **Redirect hop timeline** — Set-Cookie / Cookie-on-next-hop annotations  
+- **TLS handshake timeline** (live highlight) + **H2 priority sketch**  
+- **CORS / cache / HSTS / Range** teaching panels + lab presets with assertions  
 
 ### Labs worth knowing
-- **Set-Cookie** — Send **without** Follow redirects to see `302` + `Set-Cookie`. Enable **Cookie jar** + Follow redirects to see cookies applied on the next hop (body may then list cookies). Without a jar, `{"cookies":{}}` is expected.  
+- **Set-Cookie** — Send **without** Follow redirects to see `302` + `Set-Cookie`. Enable **Cookie jar** + Follow redirects to see cookies applied on the next hop (body may then list cookies). Without a jar, `{"cookies":{}}` is expected. Inspect/export jar under Intercept tools.  
 - **WebSocket** — URL `wss://…` + Protocol WebSocket; headers in the editor are not sent by the relay (URL + outbound message only). Status **101** in the UI is a teaching wrapper; the body is live frames from the server.  
 - **GraphQL** — selecting Protocol GraphQL sets Body type to GraphQL query and Method POST.  
+- **HTTP / SSE** — long-lived HTTP with `Accept: text/event-stream`; first response chunk is captured (not a separate wire protocol).  
 - **CL + TE** — Encode-only lab for request-smuggling ambiguity; do not Send against systems you do not own.  
+- **Range / Conditional / HSTS / CORS / Cache** — presets under the lab dropdown; assertions run on Send.  
 - **Multiplex simulator** — with packet loss + severity, compare H2 (stall all) vs H3 (stream-local).  
 
 ## Browser storage (`localStorage`)
@@ -538,9 +544,10 @@ http_checker/
 14. **WebSocket echo** preset → Send → Response shows live frames (101 is a UI wrapper).  
 15. **Lab: Set-Cookie** → Follow redirects **off** → see `Set-Cookie` on 302.  
 16. **Multiplex simulator** (HTTP/2 or 3) → enable packet loss → compare H2 stall-all vs H3 stream-local.  
-17. **Cookie jar** + Set-Cookie lab → Follow redirects on → cookies applied on next hop.  
+17. **Cookie jar** + Set-Cookie lab → Follow redirects on → cookies applied on next hop; inspect jar under Intercept.  
 18. **Lab: CL + TE** → Encode only → read smuggling notes.  
-19. See [ROADMAP.md](./ROADMAP.md) Phase 1–4 review checklists.  
+19. **Lab: Range / Conditional / HSTS / CORS** → Send → assertions + security-header teaching.  
+20. See [ROADMAP.md](./ROADMAP.md) Phase 1–4 review checklists.  
 
 ## Stack
 
@@ -554,7 +561,7 @@ http_checker/
 
 ## Roadmap
 
-See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1–4** are complete. Current release: **v0.6.0**. See [CHANGELOG.md](./CHANGELOG.md).
+See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1–4** are complete. Current release: **v0.7.0**. See [CHANGELOG.md](./CHANGELOG.md).
 
 ## License
 

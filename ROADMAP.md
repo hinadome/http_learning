@@ -24,7 +24,7 @@ Feature gaps vs similar tools ([How HTTP Works](https://howhttpworks.com/tools),
 - [x] **Environment variables** — `{{var}}` substitution in URL, headers, body before Send
 - [x] **Pre/post-request scripts and assertions** — post-response assertions (status, header, body); env vars replace pre-request scripts
 - [x] **Code generation** — Python `requests`, axios, Go, fetch, curl, raw HTTP/1.x
-- [x] **GraphQL / gRPC / WebSocket / SSE / MQTT** — protocol selector: GraphQL POST, WS relay, SSE Accept, gRPC gateway POST, MQTT bridge
+- [x] **GraphQL / gRPC / WebSocket / HTTP·SSE / MQTT** — protocol selector: GraphQL POST, WS relay, HTTP with SSE Accept (`text/event-stream`), gRPC gateway POST, MQTT bridge
 - [x] **Multipart form-data and file upload UI** — form field builder (text fields; educational multipart body)
 - [x] **Mock servers** — local mock rules, match on Send without network
 - [x] **Cloud sync / share URL / team workspaces** — **Share URL** (base64 in hash, no account); team cloud sync out of scope
@@ -64,7 +64,7 @@ Feature gaps vs similar tools ([How HTTP Works](https://howhttpworks.com/tools),
 3. **Auth** tab → Bearer token → `Authorization` header appears
 4. Preset **Lab: Redirect (302)** → Send without follow → see 302 callout
 5. Enable **Follow redirects** → Send → redirect chain in Response tab
-6. Preset **Lab: Set-Cookie response** → Follow redirects **off** → Set-Cookie teaching on Response tab (302). Follow redirects → empty cookies JSON is expected (no cookie jar).
+6. Preset **Lab: Set-Cookie response** → Follow redirects **off** → Set-Cookie teaching on Response tab (302). With **Cookie jar** off + Follow redirects → empty cookies JSON is expected; enable jar to apply cookies on the next hop.
 7. **Compare 2 vs 3** + **Multiplex lesson** panel
 
 ---
@@ -113,3 +113,7 @@ Feature gaps vs similar tools ([How HTTP Works](https://howhttpworks.com/tools),
 12. **CL + TE lab** — Encode only → smuggling notes (do not Send to untrusted hosts)
 13. **Loss severity** — Multiplex → Medium/Heavy + packet loss → longer H2 stall
 14. **TLS timeline / H2 priority** — teaching panels under TLS / H2–3 accordion
+15. **Cookie jar inspector** — Intercept → Cookie jar → edit / Clear / Export to editor
+16. **What changed** — after Send → Lifecycle callout (jar, Host, rewrite, redirects)
+17. **Redirect hop timeline** — Follow redirects → Response tab timeline with Set-Cookie / Cookie
+18. **Range / Conditional / HSTS / CORS / Cache labs** — presets + assertions; More lessons panels

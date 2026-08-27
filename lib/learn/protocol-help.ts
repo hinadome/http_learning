@@ -81,9 +81,9 @@ export const PROTOCOL_HELP: Record<RequestProtocol, ProtocolHelp> = {
     ],
   },
   sse: {
-    title: "Server-Sent Events (SSE)",
+    title: "HTTP / Server-Sent Events (SSE)",
     summary:
-      "Long-lived HTTP response with text/event-stream. The client sets Accept and reads the first response chunk.",
+      "Not a separate wire protocol — still HTTP. Long-lived response with Content-Type/Accept text/event-stream. The client sets Accept and reads the first response chunk.",
     prepare:
       "Sets Accept: text/event-stream. POST is downgraded to GET if you had POST selected.",
     validate:

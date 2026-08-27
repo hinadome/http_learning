@@ -364,16 +364,6 @@ export async function sendHttp1(
     const setCookie = getSetCookieHeader(result.response.headers);
     const nextUrl = resolveRedirectLocation(location, currentUrl);
     hop += 1;
-    redirectChain.push(
-      buildRedirectHop(
-        hop,
-        currentUrl,
-        result.response.status,
-        result.response.statusText,
-        location,
-        setCookie
-      )
-    );
 
     if (req.useCookieJar) {
       jarCookie = mergeCookieFromSetCookie(jarCookie, setCookie);
@@ -387,6 +377,18 @@ export async function sendHttp1(
         });
       }
     }
+
+    redirectChain.push(
+      buildRedirectHop(
+        hop,
+        currentUrl,
+        result.response.status,
+        result.response.statusText,
+        location,
+        setCookie,
+        jarCookie
+      )
+    );
 
     currentMethod = methodAfterRedirect(result.response.status, currentMethod);
     if (currentMethod === "GET") currentBody = "";

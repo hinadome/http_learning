@@ -7,6 +7,10 @@ import { LifecycleTimeline } from "./LifecycleTimeline";
 import { BinaryFrameView } from "./BinaryFrameView";
 import { DocLinks } from "./DocLinks";
 import { CookieTeachingPanel } from "./CookieTeachingPanel";
+import { RedirectHopTimeline } from "./RedirectHopTimeline";
+import { WhatChangedCallout } from "./WhatChangedCallout";
+import { ResponseSecurityHeadersPanel } from "./ResponseSecurityHeadersPanel";
+import { CacheControlTeachingPanel } from "./CacheControlTeachingPanel";
 
 interface Props {
   log: LearningLog | null;
@@ -15,6 +19,7 @@ interface Props {
   onTab: (t: "lifecycle" | "wire" | "response") => void;
   requestUrl?: string;
   composedHeaderText?: string;
+  useCookieJar?: boolean;
 }
 
 export function LearningLogView({
@@ -24,6 +29,7 @@ export function LearningLogView({
   onTab,
   requestUrl,
   composedHeaderText,
+  useCookieJar,
 }: Props) {
   return (
     <section className="flex flex-col gap-3">
@@ -71,6 +77,15 @@ export function LearningLogView({
           )}
           <LifecycleTimeline steps={log?.steps ?? []} />
           {log && <TimingBreakdown timing={log.timing} />}
+          {log && composedHeaderText != null && (
+            <div className="mt-3">
+              <WhatChangedCallout
+                log={log}
+                composedHeaderText={composedHeaderText}
+                useCookieJar={useCookieJar}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -84,7 +99,12 @@ export function LearningLogView({
       )}
 
       {tab === "response" && (
-        <ResponseView log={log} requestUrl={requestUrl} />
+        <ResponseView
+          log={log}
+          requestUrl={requestUrl}
+          useCookieJar={useCookieJar}
+          composedHeaderText={composedHeaderText}
+        />
       )}
     </section>
   );
@@ -124,9 +144,13 @@ function TimingBreakdown({
 function ResponseView({
   log,
   requestUrl,
+  useCookieJar,
+  composedHeaderText,
 }: {
   log: LearningLog | null;
   requestUrl?: string;
+  useCookieJar?: boolean;
+  composedHeaderText?: string;
 }) {
   const res = log?.response;
   if (!res) {
@@ -211,37 +235,10 @@ function ResponseView({
       )}
 
       {log.redirectChain && log.redirectChain.length > 0 && (
-        <div>
-          <h5 className="mb-2 text-sm font-medium text-[var(--muted)]">
-            Redirect chain
-          </h5>
-          <ol className="flex flex-col gap-1 text-xs">
-            {log.redirectChain.map((h) => (
-              <li
-                key={h.hop}
-                className="rounded border border-[var(--border)] px-2 py-1.5 font-mono"
-              >
-                {h.hop}. {h.status} {h.statusText} —{" "}
-                <span className="text-[var(--muted)]">{h.url}</span>
-                {" → "}
-                {h.location}
-                {h.setCookie && (
-                  <span className="mt-1 block text-[10px] text-[var(--warn)]">
-                    Set-Cookie on this hop
-                    {Array.isArray(h.setCookie)
-                      ? ` (${h.setCookie.length})`
-                      : ""}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ol>
-          {log.finalUrl && (
-            <p className="mt-1 text-xs text-[var(--muted)]">
-              Final URL: <span className="font-mono">{log.finalUrl}</span>
-            </p>
-          )}
-        </div>
+        <RedirectHopTimeline
+          hops={log.redirectChain}
+          finalUrl={log.finalUrl}
+        />
       )}
 
       <CookieTeachingPanel
@@ -250,20 +247,29 @@ function ResponseView({
         redirectSetCookies={log.redirectChain?.map((h) => h.setCookie)}
       />
 
+      <CacheControlTeachingPanel
+        headers={res.headers}
+        status={res.status}
+        requestHeaderText={composedHeaderText}
+      />
+
+      <ResponseSecurityHeadersPanel headers={res.headers} />
+
       {log.redirectChain &&
         log.redirectChain.length > 0 &&
         res.body.includes('"cookies"') &&
-        res.body.includes("{}") && (
+        res.body.includes("{}") &&
+        !useCookieJar && (
           <div className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm">
             <p className="font-medium">Empty cookies JSON</p>
             <p className="mt-1 text-xs text-[var(--muted)]">
               httpbin’s <code className="font-mono">/cookies</code> echoes cookies
-              the client sends back. This Node proxy does not keep a cookie jar, so
-              after a redirect the body is often{" "}
-              <code className="font-mono">{`{"cookies": {}}`}</code>. Set-Cookie
-              was still sent on the earlier 302 hop — see redirect chain or disable{" "}
-              <strong>Follow redirects</strong> to inspect Set-Cookie on the first
-              response.
+              the client sends back. With <strong>Cookie jar</strong> off, this
+              Node proxy does not replay Set-Cookie on redirect hops, so the body
+              is often{" "}
+              <code className="font-mono">{`{"cookies": {}}`}</code>. Enable the
+              jar + Follow redirects, or disable Follow redirects to inspect
+              Set-Cookie on the first 302.
             </p>
           </div>
         )}

@@ -31,6 +31,37 @@ export function clearCookieJar(): void {
   sessionStorage.removeItem(JAR_KEY);
 }
 
+export function removeJarCookie(name: string, domain: string, path: string): void {
+  saveCookieJar(
+    loadCookieJar().filter(
+      (c) => !(c.name === name && c.domain === domain && c.path === path)
+    )
+  );
+}
+
+export function updateJarCookie(
+  name: string,
+  domain: string,
+  path: string,
+  value: string
+): void {
+  const jar = loadCookieJar().map((c) =>
+    c.name === name && c.domain === domain && c.path === path
+      ? { ...c, value }
+      : c
+  );
+  saveCookieJar(jar);
+}
+
+/** Cookie header value for all non-expired jar entries (ignores URL match). */
+export function jarAsCookieHeader(): string {
+  const now = Date.now();
+  return loadCookieJar()
+    .filter((c) => !c.expiresAt || c.expiresAt > now)
+    .map((c) => `${c.name}=${c.value}`)
+    .join("; ");
+}
+
 function domainMatches(cookieDomain: string, host: string): boolean {
   const d = cookieDomain.replace(/^\./, "").toLowerCase();
   const h = host.toLowerCase();

@@ -44,6 +44,9 @@ import {
 import { loadUiPrefs, saveUiPrefs } from "@/lib/learn/ui-prefs";
 import { TlsHandshakeTimeline } from "@/components/TlsHandshakeTimeline";
 import { StreamPrioritySketch } from "@/components/StreamPrioritySketch";
+import { CookieJarPanel } from "@/components/CookieJarPanel";
+import { CorsTeachingPanel } from "@/components/CorsTeachingPanel";
+import { CacheConditionalLesson } from "@/components/CacheConditionalLesson";
 import {
   DEFAULT_REQUEST,
   mergePresetRequest,
@@ -96,6 +99,7 @@ export default function HomePage() {
     useState<BreakpointPending | null>(null);
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
   const [showSafety, setShowSafety] = useState(false);
+  const [jarRevision, setJarRevision] = useState(0);
 
   const resolvedRequest = useMemo(() => {
     const active = getActiveEnvironment(environments);
@@ -312,6 +316,7 @@ export default function HomePage() {
             ingestSetCookieHeaders(hop.setCookie, hop.url);
           }
         }
+        setJarRevision((n) => n + 1);
       }
       setHistory(
         pushHistory(
@@ -519,10 +524,24 @@ export default function HomePage() {
           <AccordionSection
             id="intercept-tools"
             title="Intercept tools"
-            summary="Mock, rewrite, session traffic"
+            summary="Mock, rewrite, cookie jar, session traffic"
           >
             <MockPanel request={request} onChange={setRequest} />
             <RewritePanel />
+            <CookieJarPanel
+              revision={jarRevision}
+              onExportCookieHeader={(line) => {
+                setRequest((prev) => ({
+                  ...prev,
+                  headerText: upsertCookieHeader(
+                    prev.headerText,
+                    line.replace(/^Cookie:\s*/i, "")
+                  ),
+                  useCookieJar: true,
+                }));
+              }}
+              onChange={() => setJarRevision((n) => n + 1)}
+            />
             <TrafficLogPanel
               entries={traffic}
               onClear={() => setTraffic([])}
@@ -559,6 +578,7 @@ export default function HomePage() {
             onTab={setTab}
             requestUrl={resolvedRequest.url}
             composedHeaderText={resolvedRequest.headerText}
+            useCookieJar={request.useCookieJar}
           />
 
           <LifecycleAnimation
@@ -569,7 +589,13 @@ export default function HomePage() {
           {log?.tlsInfo && <TlsPanel tls={log.tlsInfo} />}
           {(request.version === "2" ||
             request.version === "1.1" ||
-            Boolean(log?.tlsInfo)) && <TlsHandshakeTimeline />}
+            request.version === "3" ||
+            Boolean(log?.tlsInfo)) && (
+            <TlsHandshakeTimeline
+              tls={log?.tlsInfo}
+              httpVersion={request.version}
+            />
+          )}
 
           {showH2H3Lesson && (
             <AccordionSection
@@ -588,8 +614,10 @@ export default function HomePage() {
           <AccordionSection
             id="more-lessons"
             title="More lessons"
-            summary="MITM, CONNECT, packet capture"
+            summary="CORS, cache, MITM, CONNECT, capture"
           >
+            <CorsTeachingPanel />
+            <CacheConditionalLesson />
             <MitmLesson />
             <ConnectLesson />
             <CaptureGuidePanel />

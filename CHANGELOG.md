@@ -12,6 +12,30 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.7.0] — 2026-08-26
+
+### Added
+
+#### High-impact UX
+- **Cookie jar inspector** — list / edit / remove / clear jar; Export to editor as `Cookie:`
+- **What changed on Send** — Lifecycle callout (jar, Host fill/omit, rewrite, redirects, last-wins)
+- **Redirect hop timeline** — visual hops with Set-Cookie and Cookie-on-next-hop
+- **Assertion lab packs** — Set-Cookie, Redirect, Range, Conditional 304, Cache, HSTS, CORS presets ship with assertions
+
+#### Teaching depth
+- **Labs:** Range (206), Conditional GET (304), If-Modified-Since (304), Cache-Control, Age/Expires precedence, HSTS, CORS headers
+- **CORS teaching** + **Cache / HSTS / Range lesson** panels
+- **Cache & validators** Response panel — Cache-Control directives, Age, Expires, Date, freshness precedence, ETag / If-None-Match vs If-Modified-Since
+- **Response security headers** callout when Cache-Control / HSTS / CORS / Content-Range appear
+- **TLS timeline live highlight** — steps light up from `tlsInfo` after HTTPS Send
+- **Curriculum:** Cookies, CORS & security headers path
+
+#### UX polish
+- Clear session traffic label; empty-cookies tip mentions Cookie jar; ROADMAP Set-Cookie checklist fixed
+- **Protocol label** — dropdown shows **HTTP / SSE** (SSE is HTTP + `Accept: text/event-stream`, not a separate wire protocol)
+
+---
+
 ## [0.6.0] — 2026-08-25
 
 ### Added
