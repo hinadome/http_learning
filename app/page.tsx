@@ -14,7 +14,6 @@ import type {
   ValidationResult,
   HistoryItem,
 } from "@/lib/types";
-import { GLOSSARY } from "@/lib/learn/glossary";
 import { loadHistory, pushHistory, clearHistory } from "@/lib/learn/history";
 import {
   getActiveEnvironment,
@@ -41,12 +40,7 @@ import {
   ingestSetCookieHeaders,
   upsertCookieHeader,
 } from "@/lib/learn/cookie-jar";
-import { loadUiPrefs, saveUiPrefs } from "@/lib/learn/ui-prefs";
-import { TlsHandshakeTimeline } from "@/components/TlsHandshakeTimeline";
-import { StreamPrioritySketch } from "@/components/StreamPrioritySketch";
-import { CookieJarPanel } from "@/components/CookieJarPanel";
-import { CorsTeachingPanel } from "@/components/CorsTeachingPanel";
-import { CacheConditionalLesson } from "@/components/CacheConditionalLesson";
+import { loadUiPrefs, saveUiPrefs, setUiMode, type UiMode } from "@/lib/learn/ui-prefs";
 import {
   DEFAULT_REQUEST,
   mergePresetRequest,
@@ -55,10 +49,6 @@ import { RequestEditor } from "@/components/RequestEditor";
 import { ValidationPanel } from "@/components/ValidationPanel";
 import { LearningLogView } from "@/components/LearningLog";
 import { ExportBar } from "@/components/ExportBar";
-import { DocsPanel } from "@/components/DocsPanel";
-import { DocLinks } from "@/components/DocLinks";
-import { CompressionLesson } from "@/components/CompressionLesson";
-import { MultiplexLesson } from "@/components/MultiplexLesson";
 import { EnvironmentsPanel } from "@/components/EnvironmentsPanel";
 import { CollectionsPanel } from "@/components/CollectionsPanel";
 import { AssertionsPanel } from "@/components/AssertionsPanel";
@@ -66,17 +56,15 @@ import { MockPanel } from "@/components/MockPanel";
 import { RewritePanel } from "@/components/RewritePanel";
 import { TrafficLogPanel } from "@/components/TrafficLogPanel";
 import { BreakpointModal } from "@/components/BreakpointModal";
-import { MitmLesson } from "@/components/MitmLesson";
-import { CaptureGuidePanel } from "@/components/CaptureGuidePanel";
 import { ShareButton } from "@/components/ShareButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { MultiplexSimulator } from "@/components/MultiplexSimulator";
 import { LifecycleAnimation } from "@/components/LifecycleAnimation";
 import { TlsPanel } from "@/components/TlsPanel";
-import { ConnectLesson } from "@/components/ConnectLesson";
-import { CurriculumPanel } from "@/components/CurriculumPanel";
 import { AccordionSection } from "@/components/AccordionSection";
 import { PresetSelect } from "@/components/PresetSelect";
+import { CookieJarPanel } from "@/components/CookieJarPanel";
+import { ModeToggle } from "@/components/ModeToggle";
+import { LearnDrawer } from "@/components/LearnDrawer";
 
 const DEFAULT = DEFAULT_REQUEST;
 
@@ -100,6 +88,8 @@ export default function HomePage() {
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
   const [showSafety, setShowSafety] = useState(false);
   const [jarRevision, setJarRevision] = useState(0);
+  const [uiMode, setUiModeState] = useState<UiMode>("lab");
+  const [learnOpen, setLearnOpen] = useState(false);
 
   const resolvedRequest = useMemo(() => {
     const active = getActiveEnvironment(environments);
@@ -131,6 +121,9 @@ export default function HomePage() {
     setTraffic(loadTrafficSession());
     const prefs = loadUiPrefs();
     if (prefs.activePresetId) setActivePresetId(prefs.activePresetId);
+    if (prefs.uiMode === "lab" || prefs.uiMode === "workspace") {
+      setUiModeState(prefs.uiMode);
+    }
     fetch("/api/http3-support")
       .then((r) => r.json())
       .then(setHttp3Support)
@@ -357,6 +350,27 @@ export default function HomePage() {
     request.version === "3" ||
     compare?.pair === "2-3";
 
+  const isLab = uiMode === "lab";
+
+  function changeUiMode(mode: UiMode) {
+    setUiModeState(mode);
+    setUiMode(mode);
+    if (mode === "lab") {
+      setRequest((prev) => {
+        const p = prev.protocol ?? "http";
+        if (p === "graphql" || p === "sse" || p === "grpc" || p === "mqtt") {
+          return {
+            ...prev,
+            protocol: "http",
+            bodyType:
+              (prev.bodyType ?? "text") === "graphql" ? "json" : prev.bodyType,
+          };
+        }
+        return prev;
+      });
+    }
+  }
+
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -368,19 +382,28 @@ export default function HomePage() {
             HTTP Learning Checker
           </h1>
           <p className="max-w-xl text-sm text-[var(--muted)]">
-            Compose, validate, and send HTTP/1.x–3 — inspect wire format and
-            frames.
+            {isLab
+              ? "Lab mode — compose, validate, send, and inspect results."
+              : "Workspace — collections, mocks, rewrites, and session tools."}
           </p>
-          <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[var(--muted)]">
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <ModeToggle mode={uiMode} onChange={changeUiMode} />
             <button
               type="button"
-              className="underline hover:text-[var(--accent)]"
+              className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-sm hover:border-[var(--accent)]"
+              onClick={() => setLearnOpen(true)}
+            >
+              Learn…
+            </button>
+            <button
+              type="button"
+              className="text-xs text-[var(--muted)] underline hover:text-[var(--accent)]"
               onClick={() => setShowSafety((v) => !v)}
             >
               {showSafety ? "Hide safety note" : "Safety note"}
             </button>
             {http3Support && (
-              <span>
+              <span className="text-xs text-[var(--muted)]">
                 HTTP/3:{" "}
                 {http3Support.curlHttp3 || http3Support.currentspace
                   ? "available"
@@ -399,12 +422,34 @@ export default function HomePage() {
         <ThemeToggle />
       </header>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <PresetSelect
-          selectedId={activePresetId}
-          onSelect={(id, req) => loadPreset(req, id)}
-        />
-      </div>
+      {isLab ? (
+        <div className="flex flex-wrap items-end gap-3">
+          <PresetSelect
+            selectedId={activePresetId}
+            onSelect={(id, req) => loadPreset(req, id)}
+          />
+        </div>
+      ) : (
+        <p className="text-xs text-[var(--muted)]">
+          Lab presets are hidden here — switch to{" "}
+          <button
+            type="button"
+            className="underline hover:text-[var(--accent)]"
+            onClick={() => changeUiMode("lab")}
+          >
+            Lab
+          </button>{" "}
+          or open{" "}
+          <button
+            type="button"
+            className="underline hover:text-[var(--accent)]"
+            onClick={() => setLearnOpen(true)}
+          >
+            Learn…
+          </button>{" "}
+          for curriculum. Load your own requests from Collections below.
+        </p>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
@@ -412,6 +457,7 @@ export default function HomePage() {
             value={request}
             onChange={setRequest}
             onImportCollection={mergeOpenApiImport}
+            uiMode={uiMode}
           />
 
           <div className="flex flex-wrap items-center gap-2">
@@ -457,117 +503,123 @@ export default function HomePage() {
             >
               {busy === "send" ? "Sending…" : "Send"}
             </button>
-            <ShareButton request={request} />
             <ExportBar request={resolvedRequest} log={log} />
+            {!isLab && <ShareButton request={request} />}
           </div>
 
           <ValidationPanel result={validation} />
 
-          <AccordionSection
-            id="client-tools"
-            title="Client tools"
-            summary="Environments, collections, assertions, history"
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <EnvironmentsPanel
-                environments={environments}
-                onChange={(envs) => {
-                  setEnvironments(envs);
-                  saveEnvironments(envs);
-                }}
-                activeId={activeEnvId}
-                onActiveId={setActiveEnvId}
-              />
-              <CollectionsPanel
-                request={request}
-                onLoad={(req) => {
-                  setRequest(mergePresetRequest(req));
-                  setValidation(null);
-                  setLog(null);
-                  setActivePresetId(null);
-                }}
-              />
-            </div>
-            <AssertionsPanel value={request} onChange={setRequest} />
-            {history.length > 0 && (
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold">History</h3>
-                  <button
-                    type="button"
-                    className="rounded border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--muted)] hover:border-[var(--danger)] hover:text-[var(--danger)]"
-                    onClick={() => setHistory(clearHistory())}
-                  >
-                    Clear history
-                  </button>
+          {!isLab && (
+            <>
+              <AccordionSection
+                id="client-tools"
+                title="Client tools"
+                summary="Environments, collections, assertions, history"
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <EnvironmentsPanel
+                    environments={environments}
+                    onChange={(envs) => {
+                      setEnvironments(envs);
+                      saveEnvironments(envs);
+                    }}
+                    activeId={activeEnvId}
+                    onActiveId={setActiveEnvId}
+                  />
+                  <CollectionsPanel
+                    request={request}
+                    onLoad={(req) => {
+                      setRequest(mergePresetRequest(req));
+                      setValidation(null);
+                      setLog(null);
+                      setActivePresetId(null);
+                    }}
+                  />
                 </div>
-                <ul className="flex max-h-40 flex-col gap-1 overflow-auto text-xs">
-                  {history.map((h) => (
-                    <li key={h.id}>
+                <AssertionsPanel value={request} onChange={setRequest} />
+                {history.length > 0 && (
+                  <div>
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <h3 className="text-sm font-semibold">History</h3>
                       <button
                         type="button"
-                        className="w-full rounded border border-[var(--border)] px-2 py-1 text-left hover:border-[var(--accent)]"
-                        onClick={() => {
-                          setRequest(mergePresetRequest(h.request));
-                          setActivePresetId(null);
-                        }}
+                        className="rounded border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--muted)] hover:border-[var(--danger)] hover:text-[var(--danger)]"
+                        onClick={() => setHistory(clearHistory())}
                       >
-                        {h.summary}
+                        Clear history
                       </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </AccordionSection>
-
-          <AccordionSection
-            id="intercept-tools"
-            title="Intercept tools"
-            summary="Mock, rewrite, cookie jar, session traffic"
-          >
-            <MockPanel request={request} onChange={setRequest} />
-            <RewritePanel />
-            <CookieJarPanel
-              revision={jarRevision}
-              onExportCookieHeader={(line) => {
-                setRequest((prev) => ({
-                  ...prev,
-                  headerText: upsertCookieHeader(
-                    prev.headerText,
-                    line.replace(/^Cookie:\s*/i, "")
-                  ),
-                  useCookieJar: true,
-                }));
-              }}
-              onChange={() => setJarRevision((n) => n + 1)}
-            />
-            <TrafficLogPanel
-              entries={traffic}
-              onClear={() => setTraffic([])}
-            />
-          </AccordionSection>
-
-          <AccordionSection
-            id="learn-tools"
-            title="Learn"
-            summary="Curriculum, version docs, glossary"
-          >
-            <CurriculumPanel onLoadPreset={loadPreset} />
-            <DocsPanel version={request.version} />
-            <aside className="rounded border border-[var(--border)] bg-[var(--panel)] p-4">
-              <h3 className="mb-2 font-semibold">Glossary</h3>
-              <dl className="flex flex-col gap-2 text-sm">
-                {GLOSSARY.map((g) => (
-                  <div key={g.term}>
-                    <dt className="font-medium">{g.term}</dt>
-                    <dd className="text-[var(--muted)]">{g.summary}</dd>
-                    {g.docs && <DocLinks docs={g.docs} />}
+                    </div>
+                    <ul className="flex max-h-40 flex-col gap-1 overflow-auto text-xs">
+                      {history.map((h) => (
+                        <li key={h.id}>
+                          <button
+                            type="button"
+                            className="w-full rounded border border-[var(--border)] px-2 py-1 text-left hover:border-[var(--accent)]"
+                            onClick={() => {
+                              setRequest(mergePresetRequest(h.request));
+                              setActivePresetId(null);
+                            }}
+                          >
+                            {h.summary}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                ))}
-              </dl>
-            </aside>
-          </AccordionSection>
+                )}
+              </AccordionSection>
+
+              <AccordionSection
+                id="intercept-tools"
+                title="Intercept tools"
+                summary="Mock, rewrite, cookie jar, session traffic"
+              >
+                <MockPanel request={request} onChange={setRequest} />
+                <RewritePanel />
+                <CookieJarPanel
+                  revision={jarRevision}
+                  onExportCookieHeader={(line) => {
+                    setRequest((prev) => ({
+                      ...prev,
+                      headerText: upsertCookieHeader(
+                        prev.headerText,
+                        line.replace(/^Cookie:\s*/i, "")
+                      ),
+                      useCookieJar: true,
+                    }));
+                  }}
+                  onChange={() => setJarRevision((n) => n + 1)}
+                />
+                <TrafficLogPanel
+                  entries={traffic}
+                  onClear={() => setTraffic([])}
+                />
+              </AccordionSection>
+            </>
+          )}
+
+          {isLab && (
+            <p className="text-xs text-[var(--muted)]">
+              Need collections, mocks, or multi-protocol (GraphQL, SSE, gRPC,
+              MQTT)? Switch to{" "}
+              <button
+                type="button"
+                className="underline hover:text-[var(--accent)]"
+                onClick={() => changeUiMode("workspace")}
+              >
+                Workspace
+              </button>
+              . Teaching panels live under{" "}
+              <button
+                type="button"
+                className="underline hover:text-[var(--accent)]"
+                onClick={() => setLearnOpen(true)}
+              >
+                Learn…
+              </button>
+              .
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-4">
@@ -587,43 +639,35 @@ export default function HomePage() {
           />
 
           {log?.tlsInfo && <TlsPanel tls={log.tlsInfo} />}
-          {(request.version === "2" ||
-            request.version === "1.1" ||
-            request.version === "3" ||
-            Boolean(log?.tlsInfo)) && (
-            <TlsHandshakeTimeline
-              tls={log?.tlsInfo}
-              httpVersion={request.version}
-            />
-          )}
 
-          {showH2H3Lesson && (
-            <AccordionSection
-              id="h2h3-lessons"
-              title="HTTP/2–3 lessons"
-              summary="Compression, multiplexing, priorities"
-              defaultOpen
-            >
-              <CompressionLesson />
-              <MultiplexLesson />
-              <MultiplexSimulator />
-              <StreamPrioritySketch />
-            </AccordionSection>
+          {(log?.tlsInfo || showH2H3Lesson) && (
+            <p className="text-xs text-[var(--muted)]">
+              TLS handshake sketch, multiplex simulator, and other lessons are in{" "}
+              <button
+                type="button"
+                className="underline hover:text-[var(--accent)]"
+                onClick={() => setLearnOpen(true)}
+              >
+                Learn…
+              </button>
+              .
+            </p>
           )}
-
-          <AccordionSection
-            id="more-lessons"
-            title="More lessons"
-            summary="CORS, cache, MITM, CONNECT, capture"
-          >
-            <CorsTeachingPanel />
-            <CacheConditionalLesson />
-            <MitmLesson />
-            <ConnectLesson />
-            <CaptureGuidePanel />
-          </AccordionSection>
         </div>
       </div>
+
+      <LearnDrawer
+        open={learnOpen}
+        onClose={() => setLearnOpen(false)}
+        version={request.version}
+        showH2H3={showH2H3Lesson}
+        tlsInfo={log?.tlsInfo}
+        onLoadPreset={(req, id) => {
+          loadPreset(req, id);
+          setLearnOpen(false);
+          changeUiMode("lab");
+        }}
+      />
 
       {breakpointPending && (
         <BreakpointModal

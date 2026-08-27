@@ -8,8 +8,33 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+---
+
+## [0.8.0] — 2026-08-26
+
 ### Added
-- **Vercel & Netlify deploy** — `vercel.json`, `netlify.toml`, `@netlify/plugin-nextjs`, Node `engines >=20`, API `maxDuration` for Send/WS/MQTT; README Deploy section
+
+#### UI modes
+- **Lab / Workspace** — header toggle (persisted in `ui-prefs`); Lab = preset + editor + Validate/Encode/Send + **Copy as** + results; Workspace = collections, environments, mocks, rewrite, cookie jar, traffic, Share (lab presets hidden)
+- **Learn… drawer** — curriculum, docs, glossary, TLS sketch, multiplex, CORS/cache/MITM/CONNECT lessons (right column is Lifecycle / Wire / Response only)
+
+#### Teach labs (`teach.local`, no outbound network)
+- **If-Modified-Since** — correct Last-Modified date compare (304 vs 200); companion stale (200) preset; warn if user still hits httpbin `/cache`
+- **JWT Bearer** — HS256 verify + `exp`; presets for valid / expired / bad signature; **JWT teaching panel** on Response (decode header.payload.signature)
+
+#### Request-parts labs
+- **Custom headers**, **query parameters**, **Basic auth**, **Bearer token**, **API key (header)** — httpbin echo labs with assertions
+- Curriculum track **Headers, query & auth** (+ steps in HTTP/1.1 basics)
+
+#### Deploy
+- **Vercel & Netlify** — `vercel.json`, `netlify.toml`, `@netlify/plugin-nextjs`, Node `engines >=20`, API `maxDuration`; README Deploy section
+
+### Changed
+- **Lab protocol selector** — HTTP / REST and WebSocket only; GraphQL, HTTP/SSE, gRPC, MQTT in Workspace (switching to Lab resets advanced protocols to HTTP)
+- **Theme bootstrap** — `public/theme-init.js` via `next/script` `beforeInteractive` in `<body>` (avoids React/html `<script>` hydration errors)
+
+### Fixed
+- JWT preset tokens live in client-safe `teach-jwt-tokens.ts` (no Node `crypto` / `base64url` in the browser bundle)
 
 ---
 

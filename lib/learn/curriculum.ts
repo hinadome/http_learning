@@ -23,6 +23,31 @@ export const CURRICULA: Curriculum[] = [
         presetId: "httpbin-get",
       },
       {
+        title: "Custom headers",
+        description: "X-Lab-Trace on /headers — echo in response + Wire.",
+        presetId: "custom-headers",
+      },
+      {
+        title: "Query parameters",
+        description: "URL args via Params tab → httpbin /get echo.",
+        presetId: "query-params",
+      },
+      {
+        title: "Basic auth",
+        description: "Authorization: Basic → /basic-auth → 200 vs 401.",
+        presetId: "basic-auth",
+      },
+      {
+        title: "Bearer token",
+        description: "Authorization: Bearer → httpbin /bearer.",
+        presetId: "bearer-auth",
+      },
+      {
+        title: "JWT Bearer",
+        description: "teach.local/jwt — signature + exp teaching.",
+        presetId: "jwt-bearer",
+      },
+      {
         title: "Missing Host lab",
         description: "See validation fail; try Send anyway.",
         presetId: "missing-host",
@@ -48,9 +73,56 @@ export const CURRICULA: Curriculum[] = [
         presetId: "conditional-304",
       },
       {
-        title: "If-Modified-Since",
-        description: "Last-Modified-based 304 on /cache.",
+        title: "If-Modified-Since (304)",
+        description: "Correct date compare on teach.local (not httpbin /cache).",
         presetId: "conditional-304-ims",
+      },
+      {
+        title: "If-Modified-Since (200)",
+        description: "Stale client date → full 200 body.",
+        presetId: "conditional-ims-stale",
+      },
+    ],
+  },
+  {
+    id: "request-parts",
+    title: "Headers, query & auth",
+    description: "Custom headers, URL parameters, and Authorization schemes.",
+    steps: [
+      {
+        title: "Custom headers",
+        description: "X-Lab-Trace echoed by httpbin /headers.",
+        presetId: "custom-headers",
+      },
+      {
+        title: "Query parameters",
+        description: "Edit Params tab; httpbin /get echoes args.",
+        presetId: "query-params",
+      },
+      {
+        title: "Basic auth",
+        description: "Auth tab or Authorization header → 200 vs 401.",
+        presetId: "basic-auth",
+      },
+      {
+        title: "Bearer token",
+        description: "Bearer scheme on httpbin /bearer.",
+        presetId: "bearer-auth",
+      },
+      {
+        title: "JWT Bearer",
+        description: "teach.local — HS256 verify + exp; decode panel.",
+        presetId: "jwt-bearer",
+      },
+      {
+        title: "JWT expired",
+        description: "Valid sig, past exp → 401.",
+        presetId: "jwt-expired",
+      },
+      {
+        title: "API key (header)",
+        description: "X-API-Key via header or Auth tab.",
+        presetId: "api-key-header",
       },
     ],
   },

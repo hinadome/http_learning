@@ -156,10 +156,11 @@ export function CacheConditionalLesson() {
       <p className="mb-3 text-xs text-[var(--muted)]">
         Labs: <strong>Conditional GET (304)</strong> uses{" "}
         <code className="font-mono">If-None-Match</code> on httpbin{" "}
-        <code className="font-mono">/etag</code> (that endpoint ignores{" "}
-        <code className="font-mono">If-Modified-Since</code>).{" "}
-        <strong>If-Modified-Since (304)</strong> uses{" "}
-        <code className="font-mono">/cache</code> for the date-based validator.
+        <code className="font-mono">/etag</code>.{" "}
+        <strong>If-Modified-Since</strong> labs use an in-app{" "}
+        <code className="font-mono">teach.local</code> resource with a real date
+        compare (not httpbin <code className="font-mono">/cache</code>, which
+        304s whenever the header is present).
       </p>
 
       <dl className="mb-3 flex flex-col gap-2 text-xs">

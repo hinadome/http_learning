@@ -1,4 +1,9 @@
 import type { ComposedRequest, HttpVersion, RequestAssertion } from "../types";
+import {
+  TEACH_JWT_BAD_SIGNATURE,
+  TEACH_JWT_EXPIRED,
+  TEACH_JWT_VALID,
+} from "./teach-jwt-tokens";
 
 export interface Preset {
   id: string;
@@ -36,6 +41,7 @@ function base(
     graphqlVariables: partial.graphqlVariables ?? "{}",
     multipartFields: partial.multipartFields ?? [],
     encodeLab: partial.encodeLab,
+    teachLab: partial.teachLab,
     assertions: partial.assertions ?? [],
   };
 }
@@ -78,6 +84,165 @@ User-Agent: HTTP-Learning-Checker/1.0`,
 Content-Type: application/json
 Accept: application/json`,
       body: '{\n  "hello": "world"\n}',
+    }),
+  },
+  {
+    id: "custom-headers",
+    title: "Lab: Custom headers",
+    description:
+      "Send X-Lab-Trace and X-Request-Source — httpbin /headers echoes them in the JSON body.",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://httpbin.org/headers",
+      headerText: `Host: httpbin.org
+Accept: application/json
+X-Lab-Trace: abc-123
+X-Request-Source: http-learning-checker
+User-Agent: HTTP-Learning-Checker/1.0`,
+      assertions: [
+        assertion("as-ch-trace", "body_contains", "X-Lab-Trace"),
+        assertion("as-ch-source", "body_contains", "http-learning-checker"),
+      ],
+    }),
+  },
+  {
+    id: "query-params",
+    title: "Lab: Query parameters",
+    description:
+      "URL query string ?course=http&lesson=3&debug=true — httpbin /get echoes args in the response.",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://httpbin.org/get?course=http&lesson=3&debug=true",
+      headerText: `Host: httpbin.org
+Accept: application/json
+User-Agent: HTTP-Learning-Checker/1.0`,
+      assertions: [
+        assertion("as-qp-course", "body_contains", '"course": "http"'),
+        assertion("as-qp-lesson", "body_contains", '"lesson": "3"'),
+        assertion("as-qp-debug", "body_contains", '"debug": "true"'),
+      ],
+    }),
+  },
+  {
+    id: "basic-auth",
+    title: "Lab: Basic auth",
+    description:
+      "Authorization: Basic for httpbin /basic-auth/learner/secret — 401 without credentials, 200 when correct.",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://httpbin.org/basic-auth/learner/secret",
+      headerText: `Host: httpbin.org
+Accept: application/json
+Authorization: Basic bGVhcm5lcjpzZWNyZXQ=
+User-Agent: HTTP-Learning-Checker/1.0`,
+      assertions: [
+        assertion("as-basic-status", "status", "200"),
+        assertion("as-basic-user", "body_contains", '"user": "learner"'),
+        assertion("as-basic-auth", "body_contains", '"authenticated": true'),
+      ],
+    }),
+  },
+  {
+    id: "bearer-auth",
+    title: "Lab: Bearer token",
+    description:
+      "Authorization: Bearer — httpbin /bearer requires a token; 401 if missing or wrong.",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://httpbin.org/bearer",
+      headerText: `Host: httpbin.org
+Accept: application/json
+Authorization: Bearer lab-token-42
+User-Agent: HTTP-Learning-Checker/1.0`,
+      assertions: [
+        assertion("as-bearer-status", "status", "200"),
+        assertion("as-bearer-token", "body_contains", "lab-token-42"),
+        assertion("as-bearer-auth", "body_contains", '"authenticated": true'),
+      ],
+    }),
+  },
+  {
+    id: "jwt-bearer",
+    title: "Lab: JWT Bearer",
+    description:
+      "teach.local/jwt — validates HS256 signature and exp; Response panel decodes header.payload.signature.",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://teach.local/jwt",
+      headerText: `Host: teach.local
+Accept: application/json
+Authorization: Bearer ${TEACH_JWT_VALID}
+User-Agent: HTTP-Learning-Checker/1.0`,
+      teachLab: "jwt",
+      assertions: [
+        assertion("as-jwt-status", "status", "200"),
+        assertion("as-jwt-auth", "body_contains", '"authenticated": true'),
+        assertion("as-jwt-sub", "body_contains", '"sub": "learner"'),
+      ],
+    }),
+  },
+  {
+    id: "jwt-expired",
+    title: "Lab: JWT expired",
+    description:
+      "Valid signature but exp in the past → 401 (same Bearer header shape as opaque tokens).",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://teach.local/jwt",
+      headerText: `Host: teach.local
+Accept: application/json
+Authorization: Bearer ${TEACH_JWT_EXPIRED}
+User-Agent: HTTP-Learning-Checker/1.0`,
+      teachLab: "jwt",
+      assertions: [
+        assertion("as-jwt-exp-status", "status", "401"),
+        assertion("as-jwt-exp-reason", "body_contains", "token_expired"),
+      ],
+    }),
+  },
+  {
+    id: "jwt-bad-signature",
+    title: "Lab: JWT bad signature",
+    description:
+      "Tampered signature segment → 401 even when payload looks valid.",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://teach.local/jwt",
+      headerText: `Host: teach.local
+Accept: application/json
+Authorization: Bearer ${TEACH_JWT_BAD_SIGNATURE}
+User-Agent: HTTP-Learning-Checker/1.0`,
+      teachLab: "jwt",
+      assertions: [
+        assertion("as-jwt-sig-status", "status", "401"),
+        assertion("as-jwt-sig-reason", "body_contains", "invalid_signature"),
+      ],
+    }),
+  },
+  {
+    id: "api-key-header",
+    title: "Lab: API key (header)",
+    description:
+      "Custom X-API-Key header — httpbin /headers echoes it; compare with Auth tab → API key.",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://httpbin.org/headers",
+      headerText: `Host: httpbin.org
+Accept: application/json
+X-API-Key: lab-key-99
+User-Agent: HTTP-Learning-Checker/1.0`,
+      assertions: [
+        assertion("as-apikey-hdr", "body_contains", "X-Api-Key"),
+        assertion("as-apikey-val", "body_contains", "lab-key-99"),
+      ],
     }),
   },
   {
@@ -307,16 +472,37 @@ User-Agent: HTTP-Learning-Checker/1.0`,
     id: "conditional-304-ims",
     title: "Lab: If-Modified-Since (304)",
     description:
-      "If-Modified-Since against httpbin /cache — 304 when the header is present (clock-based validator; weaker than ETag).",
+      "In-app teach lab with correct date compare (Last-Modified ≤ If-Modified-Since → 304). Not httpbin /cache — that endpoint 304s if the header is merely present.",
     request: base({
       version: "1.1",
       method: "GET",
-      url: "https://httpbin.org/cache",
-      headerText: `Host: httpbin.org
+      url: "https://teach.local/if-modified-since",
+      headerText: `Host: teach.local
 If-Modified-Since: Wed, 21 Oct 2015 07:28:00 GMT
-Accept: */*
+Accept: application/json
 User-Agent: HTTP-Learning-Checker/1.0`,
+      teachLab: "if-modified-since",
       assertions: [assertion("as-ims-status", "status", "304")],
+    }),
+  },
+  {
+    id: "conditional-ims-stale",
+    title: "Lab: If-Modified-Since (200 stale)",
+    description:
+      "Same teach resource, but If-Modified-Since is older than Last-Modified → 200 full body (client cache is stale).",
+    request: base({
+      version: "1.1",
+      method: "GET",
+      url: "https://teach.local/if-modified-since",
+      headerText: `Host: teach.local
+If-Modified-Since: Mon, 19 Oct 2015 07:28:00 GMT
+Accept: application/json
+User-Agent: HTTP-Learning-Checker/1.0`,
+      teachLab: "if-modified-since",
+      assertions: [
+        assertion("as-ims-stale-status", "status", "200"),
+        assertion("as-ims-stale-lm", "header", "2015", "last-modified"),
+      ],
     }),
   },
   {

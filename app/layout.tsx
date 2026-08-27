@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Fraunces, Source_Sans_3, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -31,14 +32,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
       className={`${display.variable} ${sans.variable} ${mono.variable} h-full antialiased`}
     >
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('http-learning-checker-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.dataset.theme='dark';}catch(e){}})();`,
-          }}
-        />
-      </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <Script src="/theme-init.js" strategy="beforeInteractive" />
+        {children}
+      </body>
     </html>
   );
 }

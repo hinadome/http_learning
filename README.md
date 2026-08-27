@@ -11,6 +11,14 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+**UI modes** (header toggle, persisted):
+
+| Mode | Shows |
+|------|--------|
+| **Lab** (default) | Preset / labs, editor (HTTP / REST + WebSocket only), Validate / Encode / Send, **Copy as**, Lifecycle · Wire · Response |
+| **Workspace** | Full protocol selector (GraphQL, HTTP/SSE, gRPC, MQTT), collections, environments, mocks, rewrite, cookie jar, traffic, Share |
+| **Learn…** | Drawer: curriculum, docs, glossary, TLS sketch, multiplex, CORS/cache/MITM lessons |
+
 Production build:
 
 ```bash
@@ -70,15 +78,17 @@ npm run build && npm start
 | Test without the network | Mock rules; post-response assertions |
 | Intercept-style debugging | Session traffic log, rewrite rules, mock breakpoints, HAR export |
 | Deeper protocol labs | Multiplex simulator, H2 trailers/push encode, TLS panel, curriculum, dark mode |
-| Multi-protocol Send | GraphQL, WebSocket relay, HTTP / SSE, gRPC gateway, MQTT bridge + protocol explain panel |
+| Multi-protocol Send | GraphQL, WebSocket relay, HTTP / SSE, gRPC gateway, MQTT bridge (Workspace); Lab keeps HTTP + WebSocket |
 | Cookie & wire teaching | Optional cookie jar + inspector; composed vs sent; What changed; CL+TE lab |
 | Cache / CORS / Range | Conditional 304, Range 206, HSTS, CORS labs + teaching panels |
+| Auth & request parts | Custom headers, query params, Basic / Bearer / API key labs; JWT on `teach.local` |
+| Focused learning UI | Lab vs Workspace modes; Learn… drawer for lessons without crowding results |
 
 This is an **educational client**, not a production API tester.
 
 ## Architecture
 
-The UI runs in the browser. Validate/Encode/Send call **Next.js API routes** on the same app. Only **Send** opens a real network connection to the URL you entered (the API process acts as a teaching proxy).
+The UI runs in the browser. Validate/Encode/Send call **Next.js API routes** on the same app. **Send** usually opens a real network connection to the URL you entered (teaching proxy). In-app **`teach.local`** labs (If-Modified-Since, JWT) short-circuit in the server orchestrator with no outbound request.
 
 ```text
 Browser UI  --POST JSON-->  Next.js API routes
@@ -405,65 +415,35 @@ Encode/QPACK views work even when live QUIC to a given host fails.
 ```text
 http_checker/
   app/
-    page.tsx                 # Main composer + learning UI
-    layout.tsx
+    page.tsx                 # Lab / Workspace composer + results
+    layout.tsx               # Theme init via next/script
     globals.css
     api/
-      validate/route.ts
-      encode/route.ts
-      send/route.ts
-      http3-support/route.ts
+      validate|encode|send|ws|mqtt|http3-support/
   components/
-    RequestEditor.tsx        # Includes H2/H3 pseudo-header teaching callout
-    ValidationPanel.tsx      # Issues + duplicate-header callout
-    LearningLog.tsx
-    BinaryFrameView.tsx      # Wire/frames + “Actually sent”
-    LifecycleTimeline.tsx
-    QuicTimelinePanel.tsx
-    CompressionLesson.tsx    # HPACK vs QPACK
-    DocsPanel.tsx
-    DocLinks.tsx
-    ExportBar.tsx
+    ModeToggle.tsx           # Lab ↔ Workspace
+    LearnDrawer.tsx          # Curriculum / docs / lessons
+    RequestEditor.tsx        # Protocol options depend on uiMode
+    PresetSelect.tsx
+    JwtTeachingPanel.tsx
+    LearningLog.tsx          # Lifecycle · Wire · Response
+    ExportBar.tsx            # Copy as (Lab + Workspace)
+    …
   lib/
-    types.ts
-    parse.ts                 # URL + header line parsing
-    safety.ts                # SSRF, timeouts, size limits
-    validate/rules.ts
-    encode/
-      http1.ts
-      http2-frames.ts
-      http3-frames.ts
-      bytes.ts
-      index.ts
-    clients/
-      http1.ts
-      http2.ts
-      http3.ts               # currentspace + curl + Alt-Svc
-      alt-svc.ts
-      sent.ts                # Actual wire + curl reconstruction
-      index.ts               # executeRequest orchestration
+    clients/index.ts         # executeRequest + teach.local labs
     learn/
-      presets.ts
-      glossary.ts
-      docs.ts
-      export.ts
-      history.ts
-      collections.ts
-      environments.ts
-      assertions.ts
-      mock.ts
-      openapi.ts
-      share.ts
-      cookies.ts
-      quic-timeline.ts
-    env/
-      substitute.ts
-    import/
-      raw-http.ts
-      curl.ts
-      auth.ts
-    request/
-      prepare.ts
+      presets.ts             # Lab presets (incl. auth / JWT / IMS)
+      curriculum.ts
+      lab-guides.ts
+      teach-conditional.ts   # If-Modified-Since teach lab
+      teach-jwt.ts           # JWT verify (server)
+      teach-jwt-tokens.ts    # Precomputed JWTs (client-safe)
+      jwt-utils.ts           # Decode helpers (panel)
+      ui-prefs.ts            # uiMode + accordion / preset ids
+      …
+  public/
+    theme-init.js            # beforeInteractive dark theme
+  vercel.json / netlify.toml
   ROADMAP.md
 ```
 
@@ -479,20 +459,21 @@ http_checker/
 ## Features (UI)
 
 ### HTTP learning (core)
+- **Lab / Workspace** modes + **Learn…** drawer (curriculum, docs, glossary, TLS / multiplex / CORS / cache lessons)  
 - Line-by-line header editor + body (text, JSON, GraphQL, multipart)  
 - HTTP version selector (1.0 / 1.1 / 2 / 3)  
-- **Protocol** selector: HTTP, GraphQL, WebSocket, **HTTP / SSE**, gRPC (gateway), MQTT (bridge)  
+- **Protocol** selector — Lab: HTTP / REST + WebSocket; Workspace: + GraphQL, **HTTP / SSE**, gRPC, MQTT  
   - **HTTP / SSE** is still HTTP on the wire (`Accept: text/event-stream`); not a separate application protocol like WebSocket or MQTT  
 - Expanded **pseudo-header vs request-line** explanation for HTTP/2 and HTTP/3  
-- Validate, Encode, Compare (1.1/2/3 pairs), Send  
+- Validate, Encode, Compare (1.1/2/3 pairs), Send; **Copy as** in Lab and Workspace  
 - **Duplicate header warnings** with version-specific messages and panel callout  
 - Lifecycle, Wire/Binary (including **Actually sent** + QUIC timeline), Response tabs  
-- Response teaching: status codes, 3xx + Location, Set-Cookie panel, timing breakdown  
+- Response teaching: status codes, 3xx + Location, Set-Cookie, Cache/validators, JWT decode, timing  
 - Redirect chain when **Follow redirects** is enabled (HTTP/1.x)  
 - Pseudo-headers, HPACK/QPACK field notes, frame annotations  
-- HPACK vs QPACK lesson + **Multiplex lesson** (H1 vs H2 vs H3)  
-- Presets / labs (Missing Host, duplicate Accept, redirects, Set-Cookie, H2/H3 Connection, …)  
-- Glossary + version docs panel (RFC/MDN)  
+- HPACK vs QPACK lesson + **Multiplex lesson** (H1 vs H2 vs H3) under Learn…  
+- Presets / labs (auth, JWT, IMS, Missing Host, redirects, Set-Cookie, H2/H3, …) — Lab mode dropdown  
+- Glossary + version docs (Learn…)  
 - History in `localStorage` with **Clear history**  
 
 ### Import & export
@@ -500,31 +481,33 @@ http_checker/
 - **Export:** curl, fetch, raw HTTP/1.x, Python `requests`, axios, Go, **HAR 1.2**
 - **Share URL** — encode request in `#share=…` (no account)  
 
-### API-client style (local-only)
+### API-client style (Workspace)
 - **Collections / folders** — save and reload requests  
 - **Environments** — `{{variable}}` substitution before Validate/Send  
 - **Assertions** — post-response checks (status, header contains, body contains)  
-- **Protocol selector** — HTTP, GraphQL (auto body type), WebSocket, HTTP / SSE, gRPC gateway, MQTT; explain panel on change  
+- **Full protocol selector** — GraphQL (auto body type), WebSocket, HTTP / SSE, gRPC gateway, MQTT + explain panel  
 - **Mock server** — match rules on Send without network  
-- **Rewrite rules** — inject request headers / replace response body on live Send (Validate uses same inject)  
-- **Session traffic log** — intercept-style log of app Sends; click row for detail  
-- **Cookie jar** — optional; store Set-Cookie and replay Cookie; **inspector** to edit / clear / export to editor  
+- **Rewrite rules** — inject request headers / replace response body on live Send  
+- **Session traffic log** — intercept-style log; click row for detail  
+- **Cookie jar** — optional; inspector to edit / clear / export to editor  
 - **Mock breakpoints** — pause on mock match, edit response before display  
-- **MITM & capture guides** — teaching panels (no system CA / no live qvis)  
+- **MITM & capture guides** — in Learn… (no system CA / no live qvis)  
 - **CI export** — Postman collection JSON + bash curl script from collections  
-- **Wire teaching** — composed vs actually sent header diff; **What changed** callout after Send  
+- **Wire teaching** — composed vs actually sent; **What changed** after Send  
 - **Redirect hop timeline** — Set-Cookie / Cookie-on-next-hop annotations  
 - **TLS handshake timeline** (live highlight) + **H2 priority sketch**  
-- **CORS / cache / HSTS / Range** teaching panels + lab presets with assertions  
+- **CORS / cache / HSTS / Range / JWT** teaching panels + lab presets with assertions  
 
 ### Labs worth knowing
-- **Set-Cookie** — Send **without** Follow redirects to see `302` + `Set-Cookie`. Enable **Cookie jar** + Follow redirects to see cookies applied on the next hop (body may then list cookies). Without a jar, `{"cookies":{}}` is expected. Inspect/export jar under Intercept tools.  
-- **WebSocket** — URL `wss://…` + Protocol WebSocket; headers in the editor are not sent by the relay (URL + outbound message only). Status **101** in the UI is a teaching wrapper; the body is live frames from the server.  
-- **GraphQL** — selecting Protocol GraphQL sets Body type to GraphQL query and Method POST.  
-- **HTTP / SSE** — long-lived HTTP with `Accept: text/event-stream`; first response chunk is captured (not a separate wire protocol).  
+- **Custom headers / query / auth** — `/headers`, `/get?…`, `/basic-auth/…`, `/bearer`, `X-API-Key`; use **Params** and **Auth** tabs. Curriculum: **Headers, query & auth**.  
+- **JWT** — **Lab: JWT Bearer** / **JWT expired** / **JWT bad signature** on `teach.local/jwt` (in-app HS256 + `exp`); Response shows decode panel. Opaque Bearer remains **Lab: Bearer token** (httpbin).  
+- **If-Modified-Since** — **Lab: If-Modified-Since (304)** / **(200 stale)** on `teach.local` (real date compare). Avoid httpbin `/cache` (304s if the header is merely present).  
+- **Set-Cookie** — Send **without** Follow redirects to see `302` + `Set-Cookie`. Enable **Cookie jar** + Follow redirects to see cookies on the next hop. Inspect jar in Workspace.  
+- **WebSocket** — Protocol WebSocket + `wss://…` (available in Lab); relay ignores editor headers except URL + outbound message. Status **101** is a UI wrapper.  
+- **GraphQL / HTTP/SSE / gRPC / MQTT** — switch to **Workspace** for these protocols.  
 - **CL + TE** — Encode-only lab for request-smuggling ambiguity; do not Send against systems you do not own.  
-- **Range / Conditional / HSTS / CORS / Cache** — presets under the lab dropdown; assertions run on Send.  
-- **Multiplex simulator** — with packet loss + severity, compare H2 (stall all) vs H3 (stream-local).  
+- **Range / Conditional (ETag) / HSTS / CORS / Cache** — lab dropdown; assertions on Send.  
+- **Multiplex simulator** — Learn… → with packet loss + severity, compare H2 (stall all) vs H3 (stream-local).  
 
 ## Browser storage (`localStorage`)
 
@@ -537,7 +520,7 @@ http_checker/
 | `http-learning-checker-active-env` | Selected environment id |
 | `http-learning-checker-mocks` | Mock response rules |
 | `http-learning-checker-rewrites` | Rewrite rules (request inject / response replace) |
-| `http-learning-checker-ui-prefs` | Accordion open state, curriculum / preset ids |
+| `http-learning-checker-ui-prefs` | `uiMode` (lab/workspace), accordion open state, curriculum / preset ids |
 
 **Session storage** (`sessionStorage`):
 
@@ -564,26 +547,16 @@ http_checker/
 
 ## Suggested learning path
 
-1. Load **httpbin GET** → Validate → Encode → Send → inspect Response + Actually sent.  
-2. Load **Lab: Missing Host (1.1)** → Validate (fail) → enable Send anyway → Send → confirm Host omitted on Wire tab.  
-3. Switch to HTTP/2 → read the pseudo-header callout → Encode → see HPACK frames.  
-4. Load **Lab: Duplicate Accept (H2)** → Validate → note warning and “last wins” on Send → check **Actually sent**.  
-5. Load **HTTP/3 GET (Cloudflare)** → Send → inspect Alt-Svc, transport, QUIC timeline, Actually sent pseudo-headers.  
-6. Load **Lesson: HPACK vs QPACK** → **Compare 2 vs 3**.  
-7. **Import** tab → paste curl or raw HTTP → Apply.  
-8. **Environments** → `{{baseUrl}}/get` → Send.  
-9. **Lab: Redirect (302)** → with/without Follow redirects.  
-10. **Mock** panel → rule + Use mock → Send (no network).  
-11. **Rewrite** → inject header or body replace → Send → lifecycle rewrite note.  
-12. **Breakpoint** → mock rule with Breakpoint → edit response in modal.  
-13. **Session traffic** + **Copy HAR** after Send (click a traffic row for detail).  
-14. **WebSocket echo** preset → Send → Response shows live frames (101 is a UI wrapper).  
-15. **Lab: Set-Cookie** → Follow redirects **off** → see `Set-Cookie` on 302.  
-16. **Multiplex simulator** (HTTP/2 or 3) → enable packet loss → compare H2 stall-all vs H3 stream-local.  
-17. **Cookie jar** + Set-Cookie lab → Follow redirects on → cookies applied on next hop; inspect jar under Intercept.  
-18. **Lab: CL + TE** → Encode only → read smuggling notes.  
-19. **Lab: Range / Conditional / HSTS / CORS** → Send → assertions + security-header teaching.  
-20. See [ROADMAP.md](./ROADMAP.md) Phase 1–4 review checklists.  
+1. Stay in **Lab** → load **httpbin GET** → Validate → Encode → Send → Response + Actually sent.  
+2. **Custom headers** / **Query parameters** / **Basic** / **Bearer** / **JWT Bearer** (or **Learn… → Headers, query & auth**).  
+3. **Lab: Missing Host (1.1)** → Validate fail → Send anyway → confirm Host omitted on Wire.  
+4. HTTP/2 → Encode (HPACK) → **Duplicate Accept (H2)** → last-wins on Actually sent.  
+5. **HTTP/3 GET (Cloudflare)** → Alt-Svc / QUIC timeline; **Compare 2 vs 3** (Learn… HPACK vs QPACK).  
+6. **Redirect (302)**, **Set-Cookie**, **Range / Conditional / IMS / Cache / HSTS / CORS** labs.  
+7. **WebSocket echo** (Lab) → live frames.  
+8. Switch to **Workspace** → Environments `{{baseUrl}}`, mocks, rewrite, breakpoints, traffic + HAR, cookie jar.  
+9. **Lab: CL + TE** → Encode only.  
+10. See [ROADMAP.md](./ROADMAP.md) Phase 1–4 review checklists.  
 
 ## Stack
 

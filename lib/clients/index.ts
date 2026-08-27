@@ -11,6 +11,11 @@ import {
   matchRewriteRule,
 } from "../learn/rewrite";
 import { runAssertions } from "../learn/assertions";
+import {
+  isTeachIfModifiedSince,
+  runTeachIfModifiedSince,
+} from "../learn/teach-conditional";
+import { isTeachJwt, runTeachJwt } from "../learn/teach-jwt";
 import { relayWebSocket } from "./ws-relay";
 import { publishMqtt } from "./mqtt-bridge";
 import type {
@@ -302,6 +307,54 @@ export async function executeRequest(
             ? `Breakpoint resumed: ${rule.name}`
             : `Mock: ${rule.name}`,
         ],
+        assertionResults,
+        timing: { totalMs: Date.now() - t0 },
+      };
+    }
+
+    if (isTeachIfModifiedSince(req)) {
+      const taught = runTeachIfModifiedSince(req);
+      steps.push(...taught.extraSteps);
+      steps.push({
+        id: "read",
+        label: "Teach lab response (no network)",
+        status: "ok",
+        detail: `${taught.response.status} ${taught.response.statusText}`,
+      });
+      const assertionResults = runAssertions(
+        rawReq.assertions,
+        taught.response
+      );
+      return {
+        steps,
+        validation,
+        encode,
+        response: taught.response,
+        protocolNotes: [...protocolNotes, ...taught.notes],
+        assertionResults,
+        timing: { totalMs: Date.now() - t0 },
+      };
+    }
+
+    if (isTeachJwt(req)) {
+      const taught = runTeachJwt(req);
+      steps.push(...taught.extraSteps);
+      steps.push({
+        id: "read",
+        label: "Teach lab response (no network)",
+        status: "ok",
+        detail: `${taught.response.status} ${taught.response.statusText}`,
+      });
+      const assertionResults = runAssertions(
+        rawReq.assertions,
+        taught.response
+      );
+      return {
+        steps,
+        validation,
+        encode,
+        response: taught.response,
+        protocolNotes: [...protocolNotes, ...taught.notes],
         assertionResults,
         timing: { totalMs: Date.now() - t0 },
       };

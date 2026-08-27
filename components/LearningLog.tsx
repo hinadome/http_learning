@@ -11,6 +11,7 @@ import { RedirectHopTimeline } from "./RedirectHopTimeline";
 import { WhatChangedCallout } from "./WhatChangedCallout";
 import { ResponseSecurityHeadersPanel } from "./ResponseSecurityHeadersPanel";
 import { CacheControlTeachingPanel } from "./CacheControlTeachingPanel";
+import { JwtTeachingPanel } from "./JwtTeachingPanel";
 
 interface Props {
   log: LearningLog | null;
@@ -172,6 +173,23 @@ function ResponseView({
 
   return (
     <div className="flex flex-col gap-4">
+      {requestUrl?.includes("httpbin.org/cache") &&
+        !requestUrl.includes("cache/") &&
+        res.status === 304 && (
+          <div className="rounded border border-[var(--warn)]/50 bg-[var(--warn-soft)] px-3 py-2 text-sm">
+            <p className="font-medium">httpbin /cache caveat</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              httpbin returns <code className="font-mono">304</code> if{" "}
+              <code className="font-mono">If-Modified-Since</code> is present at
+              all — it does <strong>not</strong> compare that date to{" "}
+              <code className="font-mono">Last-Modified</code>. Use lab{" "}
+              <strong>If-Modified-Since (304)</strong> (
+              <code className="font-mono">teach.local</code>) for correct
+              semantics.
+            </p>
+          </div>
+        )}
+
       <div className="flex flex-wrap items-center gap-3">
         <span
           className="rounded px-2 py-1 font-mono text-sm font-semibold text-white"
@@ -251,6 +269,12 @@ function ResponseView({
         headers={res.headers}
         status={res.status}
         requestHeaderText={composedHeaderText}
+      />
+
+      <JwtTeachingPanel
+        requestHeaderText={composedHeaderText}
+        requestUrl={requestUrl}
+        responseStatus={res.status}
       />
 
       <ResponseSecurityHeadersPanel headers={res.headers} />

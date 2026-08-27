@@ -3,6 +3,9 @@ export type HttpVersion = "1.0" | "1.1" | "2" | "3";
 /** Optional encode-only lab mode (Wire tab). */
 export type EncodeLab = "chunked" | "h2-trailers" | "h2-push" | "cl-te-smuggle";
 
+/** In-app teaching labs (no outbound network; correct protocol semantics). */
+export type TeachLab = "if-modified-since" | "jwt";
+
 export interface TlsInfo {
   protocol?: string;
   alpnProtocol?: string;
@@ -183,6 +186,8 @@ export interface ComposedRequest {
   };
   /** Wire-tab lab: chunked body, H2 trailers, or H2 push frames. */
   encodeLab?: EncodeLab;
+  /** Local teaching lab (correct semantics; no outbound HTTP). */
+  teachLab?: TeachLab;
 }
 
 export interface ParsedRequest {

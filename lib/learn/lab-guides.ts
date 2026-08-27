@@ -18,6 +18,167 @@ export const LAB_GUIDES: Record<string, LabGuide> = {
     ],
     why: "Baseline happy-path request.",
   },
+  "custom-headers": {
+    steps: [
+      "Validate → Send — assertions check the echo body.",
+      "Response JSON → headers object lists X-Lab-Trace and X-Request-Source.",
+      "Wire tab → confirm custom lines on Actually sent.",
+      "Try adding X-Custom-Note: hello in the header textarea → Send again.",
+    ],
+    why: "Arbitrary request headers travel on the wire; servers and gateways may log, route, or reject them.",
+    explain: [
+      "Header names are case-insensitive; httpbin may normalize casing in JSON.",
+      "Custom X-… headers are common for tracing (X-Request-Id), feature flags, and client metadata.",
+      "Some proxies strip unknown headers; APIs document which custom headers they accept.",
+    ],
+    docs: [
+      {
+        label: "MDN: HTTP headers",
+        url: "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers",
+        source: "MDN",
+      },
+    ],
+  },
+  "query-params": {
+    steps: [
+      "Send — Response args block should echo course, lesson, and debug.",
+      "Open Params tab → toggle debug off → URL loses ?debug=true → Send → gone from args.",
+      "Add sort=asc in Params → Send → new key appears in args.",
+      "Encode — query string stays on the request line / :path pseudo-header.",
+    ],
+    why: "Query parameters encode filters and options in the URL without changing the path.",
+    explain: [
+      "?key=value pairs are separated by &; values should be percent-encoded when needed.",
+      "GET requests often carry parameters in the query string; POST may use body instead.",
+      "The Params tab edits the same URL the main editor shows — one source of truth.",
+    ],
+    docs: [
+      {
+        label: "MDN: URLSearchParams",
+        url: "https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams",
+        source: "MDN",
+      },
+    ],
+  },
+  "basic-auth": {
+    steps: [
+      "Send → expect 200 and authenticated: true (user learner).",
+      "Auth tab → type Basic → username learner, password secret — headers update automatically.",
+      "Remove Authorization → Send → 401 Unauthorized.",
+      "Wrong password → Send → 401; Wire still shows Authorization on Actually sent.",
+    ],
+    why: "Basic sends credentials in one Authorization header (Base64, not encryption). Use HTTPS only.",
+    explain: [
+      "Format: Authorization: Basic base64(username:password).",
+      "httpbin validates against the path /basic-auth/{user}/{pass}.",
+      "Prefer OAuth2/Bearer or session cookies for production user login.",
+    ],
+    docs: [
+      {
+        label: "MDN: Authorization",
+        url: "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Authorization",
+        source: "MDN",
+      },
+      {
+        label: "RFC 7617 — Basic auth scheme",
+        url: "https://www.rfc-editor.org/rfc/rfc7617",
+        source: "RFC",
+      },
+    ],
+  },
+  "bearer-auth": {
+    steps: [
+      "Send → 200; body echoes your token.",
+      "Auth tab → Bearer → paste a different token → Send → new value in response.",
+      "Delete Authorization line → Send → 401.",
+      "Next: **Lab: JWT Bearer** — same header shape, structured token + signature check.",
+    ],
+    why: "Bearer tokens (OAuth2, JWT, PAT) are the common API auth pattern after Basic.",
+    explain: [
+      "Format: Authorization: Bearer <token> — one secret string, no username.",
+      "Opaque tokens (this httpbin lab) are validated server-side by lookup.",
+      "JWTs are self-contained — see Lab: JWT Bearer for header.payload.signature.",
+    ],
+    docs: [
+      {
+        label: "MDN: Authorization",
+        url: "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Authorization",
+        source: "MDN",
+      },
+      {
+        label: "RFC 6750 — Bearer token",
+        url: "https://www.rfc-editor.org/rfc/rfc6750",
+        source: "RFC",
+      },
+    ],
+  },
+  "jwt-bearer": {
+    steps: [
+      "Send → 200; Response body lists decoded claims (sub: learner).",
+      "Response tab → JWT Bearer teaching panel shows header / payload / signature colors.",
+      "Change one character in the signature (last segment) → Send → 401 invalid_signature.",
+      "Load Lab: JWT expired or JWT bad signature for the other failure modes.",
+      "Remove Authorization → Send → 401 missing_bearer.",
+    ],
+    why: "JWT is still Authorization: Bearer on the wire — but the server parses, verifies, and checks exp.",
+    explain: [
+      "Segments: base64url(header).base64url(payload).base64url(HMAC-SHA256).",
+      "This lab uses HS256 + a fixed teaching secret — production APIs often use RS256 + JWKS.",
+      "exp (expiration) can fail auth even when the signature is valid.",
+      "Malformed tokens (< 3 segments) → 400; bad signature or expired → 401.",
+    ],
+    docs: [
+      {
+        label: "RFC 7519 — JSON Web Token",
+        url: "https://www.rfc-editor.org/rfc/rfc7519",
+        source: "RFC",
+      },
+      {
+        label: "RFC 7515 — JWS",
+        url: "https://www.rfc-editor.org/rfc/rfc7515",
+        source: "RFC",
+      },
+    ],
+  },
+  "jwt-expired": {
+    steps: [
+      "Send → 401 token_expired in JSON body.",
+      "JWT panel → exp is in the past (2018) — signature was still verified first.",
+      "Load Lab: JWT Bearer for a valid token → 200.",
+    ],
+    why: "Short-lived access tokens limit damage if leaked; clients refresh before exp.",
+    explain: [
+      "Order in this lab: parse → verify signature → then check exp.",
+      "Clock skew: real servers may allow a small leeway (nbf / exp).",
+    ],
+  },
+  "jwt-bad-signature": {
+    steps: [
+      "Send → 401 invalid_signature.",
+      "Compare payload segment with Lab: JWT Bearer — payload unchanged, signature tampered.",
+      "Edit payload (middle segment) without re-signing → same 401.",
+    ],
+    why: "The signature binds header + payload; any tampering must fail verification.",
+  },
+  "api-key-header": {
+    steps: [
+      "Send → /headers JSON includes X-Api-Key: lab-key-99.",
+      "Auth tab → API key → header name X-API-Key, value lab-key-99 — same wire result.",
+      "Switch API key to query param → URL gains ?X-API-Key=… (httpbin /get echoes args).",
+    ],
+    why: "API keys identify the caller; header vs query affects caching, logs, and referrer leakage.",
+    explain: [
+      "Header placement keeps keys out of browser history and server access-log query strings.",
+      "Query keys are easy to try in a browser but may appear in Referer headers.",
+    ],
+    docs: [
+      {
+        label: "MDN: API keys (concept)",
+        url: "https://developer.mozilla.org/en-US/docs/Glossary/API_key",
+        source: "MDN",
+      },
+    ],
+  },
   "missing-host": {
     steps: [
       "Validate — expect Host required error on HTTP/1.1.",
@@ -82,16 +243,17 @@ export const LAB_GUIDES: Record<string, LabGuide> = {
   },
   "conditional-304-ims": {
     steps: [
-      "Send with If-Modified-Since → expect 304 on httpbin /cache.",
-      "Remove If-Modified-Since → Send → 200 + Last-Modified + ETag.",
-      "Compare with Lab: Conditional GET (304) which uses If-None-Match on /etag.",
+      "Send → expect 304 (Last-Modified equals If-Modified-Since on the teach lab).",
+      "Change If-Modified-Since to an earlier date (e.g. Mon, 19 Oct 2015) → Send → 200, or load Lab: If-Modified-Since (200 stale).",
+      "Do not use httpbin /cache for this lesson — it 304s whenever the header is present, even if Last-Modified is newer.",
     ],
-    why: "If-Modified-Since is the Last-Modified-based conditional GET; ETag / If-None-Match is usually stronger.",
+    why: "Real servers compare dates: 304 only if the resource was not modified after If-Modified-Since.",
     explain: [
       "Last-Modified (response) ↔ If-Modified-Since (request).",
-      "httpbin /cache returns 304 if either If-Modified-Since or If-None-Match is present (simple demo — not full date comparison).",
-      "Real servers compare the date: if the resource is not newer than your date → 304; else 200.",
-      "If both If-None-Match and If-Modified-Since are sent, If-None-Match usually wins.",
+      "This app’s teach.local lab uses a fixed Last-Modified: Wed, 21 Oct 2015 07:28:00 GMT.",
+      "Last-Modified ≤ If-Modified-Since → 304. Last-Modified > If-Modified-Since → 200.",
+      "httpbin /cache ignores the date and is misleading for learning.",
+      "When both If-None-Match and If-Modified-Since are sent, If-None-Match usually wins.",
     ],
     docs: [
       {
@@ -104,6 +266,22 @@ export const LAB_GUIDES: Record<string, LabGuide> = {
         url: "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Last-Modified",
         source: "MDN",
       },
+      {
+        label: "RFC 9110 — If-Modified-Since",
+        url: "https://www.rfc-editor.org/rfc/rfc9110#name-if-modified-since",
+        source: "RFC",
+      },
+    ],
+  },
+  "conditional-ims-stale": {
+    steps: [
+      "Send → expect 200 (If-Modified-Since is before Last-Modified).",
+      "Set If-Modified-Since to Wed, 21 Oct 2015 07:28:00 GMT → 304, or load the 304 IMS lab.",
+    ],
+    why: "Shows the opposite branch of the date comparison from the 304 lab.",
+    explain: [
+      "Client’s cached time is older than the resource → full 200 body + Last-Modified.",
+      "Update your stored Last-Modified, then conditional GET again later.",
     ],
   },
   "cache-control": {

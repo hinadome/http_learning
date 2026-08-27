@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ComposedRequest, HttpVersion, RequestProtocol, BodyType } from "@/lib/types";
+import type { UiMode } from "@/lib/learn/ui-prefs";
 import { newMultipartFieldId } from "@/lib/request/prepare";
 import { METHOD_INFO } from "@/lib/learn/glossary";
 import { docsForMethod } from "@/lib/learn/docs";
@@ -14,18 +15,57 @@ import { ProtocolExplainPanel } from "./ProtocolExplainPanel";
 const VERSIONS: HttpVersion[] = ["1.0", "1.1", "2", "3"];
 const METHODS = Object.keys(METHOD_INFO);
 
+const PROTOCOL_OPTIONS: Array<{ value: RequestProtocol; label: string }> = [
+  { value: "http", label: "HTTP / REST" },
+  { value: "graphql", label: "GraphQL" },
+  { value: "websocket", label: "WebSocket" },
+  { value: "sse", label: "HTTP / SSE" },
+  { value: "grpc", label: "gRPC (gateway)" },
+  { value: "mqtt", label: "MQTT (bridge)" },
+];
+
+const LAB_PROTOCOLS = new Set<RequestProtocol>(["http", "websocket"]);
+
 type EditorTab = "main" | "params" | "auth" | "import";
 
 interface Props {
   value: ComposedRequest;
   onChange: (next: ComposedRequest) => void;
   onImportCollection?: (entries: import("@/lib/types").CollectionEntry[]) => void;
+  /** Lab hides GraphQL / SSE / gRPC / MQTT; Workspace shows all. */
+  uiMode?: UiMode;
 }
 
-export function RequestEditor({ value, onChange, onImportCollection }: Props) {
+export function RequestEditor({
+  value,
+  onChange,
+  onImportCollection,
+  uiMode = "lab",
+}: Props) {
   const [tab, setTab] = useState<EditorTab>("main");
   const methodInfo = METHOD_INFO[value.method];
   const methodDoc = docsForMethod(value.method);
+  const isLab = uiMode === "lab";
+  const protocolOptions = PROTOCOL_OPTIONS.filter((o) =>
+    isLab ? LAB_PROTOCOLS.has(o.value) : true
+  );
+
+  function applyProtocolChange(protocol: RequestProtocol) {
+    const next: ComposedRequest = { ...value, protocol };
+    if (protocol === "graphql") {
+      next.bodyType = "graphql";
+      next.method = "POST";
+      if (!next.graphqlVariables?.trim()) {
+        next.graphqlVariables = "{}";
+      }
+    } else if (
+      value.protocol === "graphql" &&
+      (value.bodyType ?? "text") === "graphql"
+    ) {
+      next.bodyType = "json";
+    }
+    onChange(next);
+  }
 
   return (
     <section className="flex flex-col gap-4">
@@ -131,31 +171,21 @@ export function RequestEditor({ value, onChange, onImportCollection }: Props) {
               <select
                 className="rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm"
                 value={value.protocol ?? "http"}
-                onChange={(e) => {
-                  const protocol = e.target.value as RequestProtocol;
-                  const next: ComposedRequest = { ...value, protocol };
-                  if (protocol === "graphql") {
-                    next.bodyType = "graphql";
-                    next.method = "POST";
-                    if (!next.graphqlVariables?.trim()) {
-                      next.graphqlVariables = "{}";
-                    }
-                  } else if (
-                    value.protocol === "graphql" &&
-                    (value.bodyType ?? "text") === "graphql"
-                  ) {
-                    next.bodyType = "json";
-                  }
-                  onChange(next);
-                }}
+                onChange={(e) =>
+                  applyProtocolChange(e.target.value as RequestProtocol)
+                }
               >
-                <option value="http">HTTP / REST</option>
-                <option value="graphql">GraphQL</option>
-                <option value="websocket">WebSocket</option>
-                <option value="sse">HTTP / SSE</option>
-                <option value="grpc">gRPC (gateway)</option>
-                <option value="mqtt">MQTT (bridge)</option>
+                {protocolOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </select>
+              {isLab && (
+                <span className="text-[10px] text-[var(--muted)]">
+                  GraphQL, HTTP/SSE, gRPC, MQTT — switch to Workspace.
+                </span>
+              )}
             </label>
 
             <label className="flex flex-col gap-1 text-sm">
