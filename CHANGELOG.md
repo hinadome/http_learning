@@ -10,6 +10,13 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.8.2] — 2026-08-27
+
+### Added
+- **Outbound API rate limiting** — per-IP limits on `/api/send` (30/min), `/api/ws` and `/api/mqtt` (15/min); configurable via `RATE_LIMIT_*` env vars; **429** + `Retry-After`
+
+---
+
 ## [0.8.1] — 2026-08-27
 
 ### Changed

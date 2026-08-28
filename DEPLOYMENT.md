@@ -235,6 +235,7 @@ Teach labs (`teach.local` JWT / If-Modified-Since) run **in the API process** â€
 ## Security
 
 - Do not expose to the public internet without understanding **SSRF** risk on `/api/send`.
+- **Rate limiting** â€” `/api/send`, `/api/ws`, and `/api/mqtt` enforce per-IP fixed windows (in-memory, per instance): 30/min Send, 15/min WS and MQTT by default. Override with `RATE_LIMIT_SEND_MAX`, `RATE_LIMIT_WS_MAX`, `RATE_LIMIT_MQTT_MAX`, `RATE_LIMIT_WINDOW_MS`. Clients receive **429** + `Retry-After`.
 - No server-side credential storage; cookie jar and collections are browser `localStorage` / `sessionStorage` only.
 - Block private targets by default; users must opt in to **Allow private targets**.
 

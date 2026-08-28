@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { executeRequest } from "@/lib/clients";
+import { enforceOutboundRateLimit } from "@/lib/api-rate-limit";
 import type { ComposedRequest, MockRule, RewriteRule } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -12,6 +13,9 @@ interface SendBody extends ComposedRequest {
 }
 
 export async function POST(request: Request) {
+  const limited = enforceOutboundRateLimit(request, "send");
+  if (limited) return limited;
+
   try {
     const body = (await request.json()) as SendBody;
     const { mockRules, rewriteRules, ...req } = body;

@@ -66,6 +66,7 @@ Pre-deploy gate:
 - **HTTP/3** — `@currentspace/http3` may work when the function environment supports it; `curl --http3` fallback is usually **unavailable** on serverless. Encode/QPACK still works without live H3.
 - **Outbound proxy** — this app opens connections to URLs you enter. Deploy only for trusted users; SSRF guards apply, but public open proxies invite abuse.
 - Prefer **Node** runtime (already set on all `/api/*` routes) — not Edge.
+- **Rate limits** on outbound routes: `/api/send` 30 req/min/IP, `/api/ws` and `/api/mqtt` 15 req/min/IP (429 when exceeded). See [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 Local production check:
 

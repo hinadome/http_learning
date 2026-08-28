@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { publishMqtt } from "@/lib/clients/mqtt-bridge";
+import { enforceOutboundRateLimit } from "@/lib/api-rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
+  const limited = enforceOutboundRateLimit(request, "mqtt");
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const result = await publishMqtt(body);
