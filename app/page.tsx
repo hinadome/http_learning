@@ -209,6 +209,7 @@ export default function HomePage() {
       if (comparePair) {
         const result = data as CompareEncodeResult;
         setCompare(result);
+        setLearnOpen(true);
         setLog((prev) => ({
           steps: [
             ...(prev?.steps ?? []),
@@ -631,6 +632,7 @@ export default function HomePage() {
             requestUrl={resolvedRequest.url}
             composedHeaderText={resolvedRequest.headerText}
             useCookieJar={request.useCookieJar}
+            onOpenMultiplexLearn={() => setLearnOpen(true)}
           />
 
           <LifecycleAnimation
@@ -640,9 +642,9 @@ export default function HomePage() {
 
           {log?.tlsInfo && <TlsPanel tls={log.tlsInfo} />}
 
-          {(log?.tlsInfo || showH2H3Lesson) && (
+          {isLab && (
             <p className="text-xs text-[var(--muted)]">
-              TLS handshake sketch, multiplex simulator, and other lessons are in{" "}
+              Curriculum, HTTP/1.1–3 multiplex simulator, and other lessons are in{" "}
               <button
                 type="button"
                 className="underline hover:text-[var(--accent)]"
@@ -661,6 +663,7 @@ export default function HomePage() {
         onClose={() => setLearnOpen(false)}
         version={request.version}
         showH2H3={showH2H3Lesson}
+        comparePair={compare?.pair ?? null}
         tlsInfo={log?.tlsInfo}
         onLoadPreset={(req, id) => {
           loadPreset(req, id);

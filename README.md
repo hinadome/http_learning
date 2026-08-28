@@ -17,7 +17,7 @@ Open [http://localhost:3000](http://localhost:3000).
 |------|--------|
 | **Lab** (default) | Preset / labs, editor (HTTP / REST + WebSocket only), Validate / Encode / Send, **Copy as**, Lifecycle · Wire · Response |
 | **Workspace** | Full protocol selector (GraphQL, HTTP/SSE, gRPC, MQTT), collections, environments, mocks, rewrite, cookie jar, traffic, Share |
-| **Learn…** | Drawer: curriculum, docs, glossary, TLS sketch, multiplex, CORS/cache/MITM lessons |
+| **Learn…** | Drawer: curriculum, docs, glossary, **HTTP/1.1–3 multiplex simulator**, TLS sketch, HPACK/QPACK, CORS/cache/MITM lessons |
 
 Production build:
 
@@ -31,6 +31,15 @@ npm start
 ## Deploy
 
 This is a **Next.js** App Router app (Node.js API routes). It is not a static site — Validate / Encode / Send need a server runtime.
+
+**Full guide:** [DEPLOYMENT.md](./DEPLOYMENT.md) (Vercel, Netlify, self-host, pre-deploy script).
+
+Pre-deploy gate:
+
+```bash
+./scripts/deploy-check.sh
+# or: npm run deploy:check
+```
 
 | Platform | Config | Notes |
 |----------|--------|--------|
@@ -409,6 +418,8 @@ Encode/QPACK views work even when live QUIC to a given host fails.
 - Compare 1.1 vs 2 — text wire vs H2 + HPACK  
 - Compare 1.1 vs 3 — text wire vs H3 + QPACK  
 - Compare 2 vs 3 — HPACK vs QPACK lesson  
+- After **Compare…**, the **Wire** tab shows a callout and **Learn…** opens with **HTTP/1.1–3 multiplexing** pinned — click **Simulate load** to animate H1 / H2 / H3 (packet loss on 2 vs 3).  
+- External reference lab: [h2-h3-multiplex-lab](https://network-priority.github.io/h2-h3-multiplex-lab/) (GitHub Pages).  
 
 ## Project structure
 
@@ -443,6 +454,9 @@ http_checker/
       …
   public/
     theme-init.js            # beforeInteractive dark theme
+  scripts/
+    deploy-check.sh          # pre-deploy: ci + tsc + build
+  DEPLOYMENT.md
   vercel.json / netlify.toml
   ROADMAP.md
 ```
@@ -507,7 +521,7 @@ http_checker/
 - **GraphQL / HTTP/SSE / gRPC / MQTT** — switch to **Workspace** for these protocols.  
 - **CL + TE** — Encode-only lab for request-smuggling ambiguity; do not Send against systems you do not own.  
 - **Range / Conditional (ETag) / HSTS / CORS / Cache** — lab dropdown; assertions on Send.  
-- **Multiplex simulator** — Learn… → with packet loss + severity, compare H2 (stall all) vs H3 (stream-local).  
+- **Multiplex simulator** — always under **Learn… → HTTP/1.1–3 multiplexing** (H1 / H2 / H3 tabs + packet loss); auto-opens after **Compare…** with **Simulate load** highlighted; HPACK/QPACK lesson when editor version is HTTP/2 or 3  
 
 ## Browser storage (`localStorage`)
 
@@ -550,8 +564,8 @@ http_checker/
 1. Stay in **Lab** → load **httpbin GET** → Validate → Encode → Send → Response + Actually sent.  
 2. **Custom headers** / **Query parameters** / **Basic** / **Bearer** / **JWT Bearer** (or **Learn… → Headers, query & auth**).  
 3. **Lab: Missing Host (1.1)** → Validate fail → Send anyway → confirm Host omitted on Wire.  
-4. HTTP/2 → Encode (HPACK) → **Duplicate Accept (H2)** → last-wins on Actually sent.  
-5. **HTTP/3 GET (Cloudflare)** → Alt-Svc / QUIC timeline; **Compare 2 vs 3** (Learn… HPACK vs QPACK).  
+4. HTTP/2 → Encode (HPACK) → **Compare… → 1.1 vs 2** → **Simulate load** in Learn.  
+5. **HTTP/3 GET (Cloudflare)** → Alt-Svc / QUIC timeline; **Compare 2 vs 3** → packet-loss demo in multiplex simulator.  
 6. **Redirect (302)**, **Set-Cookie**, **Range / Conditional / IMS / Cache / HSTS / CORS** labs.  
 7. **WebSocket echo** (Lab) → live frames.  
 8. Switch to **Workspace** → Environments `{{baseUrl}}`, mocks, rewrite, breakpoints, traffic + HAR, cookie jar.  
@@ -570,7 +584,7 @@ http_checker/
 
 ## Roadmap
 
-See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1–4** are complete. Current release: **v0.7.0**. See [CHANGELOG.md](./CHANGELOG.md).
+See [ROADMAP.md](./ROADMAP.md) for planned features and review checklists. **Phase 1–4** are complete. Current release: **v0.8.1**. See [CHANGELOG.md](./CHANGELOG.md).
 
 ## License
 

@@ -21,6 +21,7 @@ interface Props {
   requestUrl?: string;
   composedHeaderText?: string;
   useCookieJar?: boolean;
+  onOpenMultiplexLearn?: () => void;
 }
 
 export function LearningLogView({
@@ -31,6 +32,7 @@ export function LearningLogView({
   requestUrl,
   composedHeaderText,
   useCookieJar,
+  onOpenMultiplexLearn,
 }: Props) {
   return (
     <section className="flex flex-col gap-3">
@@ -96,6 +98,7 @@ export function LearningLogView({
           sent={log?.sent ?? null}
           compare={compare}
           composedHeaderText={composedHeaderText}
+          onOpenMultiplexLearn={onOpenMultiplexLearn}
         />
       )}
 

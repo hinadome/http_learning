@@ -10,6 +10,21 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.8.1] — 2026-08-27
+
+### Changed
+- **Learn drawer** — multiplex load simulator (H1 / H2 / H3) always visible; HPACK/QPACK + priority sketch only when request version is HTTP/2 or 3
+- **Compare encode** — opens Learn with pinned **HTTP/1.1–3 multiplexing** and highlighted **Simulate load**; Wire tab shows callout + button to open simulator
+
+### Fixed
+- **Multiplex lesson link** — `network-priority.com/http2-http3-multiplex-lab` returned 404; now points to live [GitHub Pages demo](https://network-priority.github.io/h2-h3-multiplex-lab/)
+
+### Added
+- **DEPLOYMENT.md** — Vercel, Netlify, self-host, and pre-deploy check documentation
+- **`scripts/deploy-check.sh`** — `npm ci` + `tsc` + `next build` gate (`npm run deploy:check`)
+
+---
+
 ## [0.8.0] — 2026-08-26
 
 ### Added

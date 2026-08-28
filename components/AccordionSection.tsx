@@ -8,6 +8,8 @@ interface Props {
   title: string;
   summary?: string;
   defaultOpen?: boolean;
+  /** Force open with accent styling (e.g. after Compare encode). */
+  pinned?: boolean;
   children: ReactNode;
 }
 
@@ -16,19 +18,25 @@ export function AccordionSection({
   title,
   summary,
   defaultOpen = false,
+  pinned = false,
   children,
 }: Props) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpen] = useState(defaultOpen || pinned);
   const panelId = useId();
 
   useEffect(() => {
+    if (pinned) {
+      setOpen(true);
+      return;
+    }
     const prefs = loadUiPrefs();
     if (typeof prefs.accordionOpen[id] === "boolean") {
       setOpen(prefs.accordionOpen[id]);
     }
-  }, [id]);
+  }, [id, pinned]);
 
   function toggle() {
+    if (pinned) return;
     setOpen((v) => {
       const next = !v;
       setAccordionOpen(id, next);
@@ -37,13 +45,20 @@ export function AccordionSection({
   }
 
   return (
-    <section className="rounded border border-[var(--border)] bg-[var(--panel)]">
+    <section
+      className={`rounded border bg-[var(--panel)] ${
+        pinned
+          ? "border-[var(--accent)] ring-2 ring-[var(--accent-soft)]"
+          : "border-[var(--border)]"
+      }`}
+    >
       <button
         type="button"
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
         aria-expanded={open}
         aria-controls={panelId}
         onClick={toggle}
+        disabled={pinned}
       >
         <span>
           <span className="block text-sm font-semibold">{title}</span>
@@ -54,7 +69,7 @@ export function AccordionSection({
           )}
         </span>
         <span className="font-mono text-xs text-[var(--muted)]" aria-hidden>
-          {open ? "−" : "+"}
+          {pinned ? "●" : open ? "−" : "+"}
         </span>
       </button>
       {open && (

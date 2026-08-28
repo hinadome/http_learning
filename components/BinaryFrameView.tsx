@@ -1,6 +1,7 @@
 "use client";
 
-import type { EncodeResult, LearningLog } from "@/lib/types";
+import type { CompareEncodeResult, EncodeResult, LearningLog } from "@/lib/types";
+import { multiplexSimForCompare } from "@/lib/learn/compare-multiplex";
 import { QuicTimelinePanel } from "./QuicTimelinePanel";
 import { ComposedVsSentDiff } from "./ComposedVsSentDiff";
 
@@ -8,12 +9,8 @@ interface Props {
   encode: EncodeResult | null;
   sent?: LearningLog["sent"] | null;
   composedHeaderText?: string;
-  compare?: {
-    left: EncodeResult;
-    right: EncodeResult;
-    leftTitle: string;
-    rightTitle: string;
-  } | null;
+  compare?: CompareEncodeResult | null;
+  onOpenMultiplexLearn?: () => void;
 }
 
 export function BinaryFrameView({
@@ -21,12 +18,31 @@ export function BinaryFrameView({
   sent,
   compare,
   composedHeaderText,
+  onOpenMultiplexLearn,
 }: Props) {
   if (compare) {
+    const simHint = multiplexSimForCompare(compare.pair);
     return (
-      <div className="grid gap-4 lg:grid-cols-2">
-        <EncodeBlock title={compare.leftTitle} encode={compare.left} />
-        <EncodeBlock title={compare.rightTitle} encode={compare.right} />
+      <div className="flex flex-col gap-4">
+        <div className="rounded border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-3 text-sm">
+          <p className="font-medium">
+            Compared {compare.leftTitle} vs {compare.rightTitle}
+          </p>
+          <p className="mt-1 text-xs text-[var(--muted)]">{simHint.hint}</p>
+          {onOpenMultiplexLearn && (
+            <button
+              type="button"
+              className="mt-2 rounded bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white"
+              onClick={onOpenMultiplexLearn}
+            >
+              Open HTTP/1.1–3 multiplexing → Simulate load
+            </button>
+          )}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <EncodeBlock title={compare.leftTitle} encode={compare.left} />
+          <EncodeBlock title={compare.rightTitle} encode={compare.right} />
+        </div>
       </div>
     );
   }

@@ -15,6 +15,15 @@ type StreamState = {
   done: boolean;
 };
 
+interface MultiplexSimulatorProps {
+  /** Highlight Simulate load (e.g. after Compare encode). */
+  emphasizeSimulate?: boolean;
+  /** Pre-select H1 / H2 / H3 tab when linked from Compare. */
+  initialMode?: Mode;
+  /** Turn on packet-loss demo when Compare was 2 vs 3. */
+  initialPacketLoss?: boolean;
+}
+
 function emptyStreams(): StreamState[] {
   return Array.from({ length: ASSETS }, () => ({
     progress: 0,
@@ -23,9 +32,13 @@ function emptyStreams(): StreamState[] {
   }));
 }
 
-export function MultiplexSimulator() {
-  const [mode, setMode] = useState<Mode>("h2");
-  const [packetLoss, setPacketLoss] = useState(true);
+export function MultiplexSimulator({
+  emphasizeSimulate = false,
+  initialMode = "h2",
+  initialPacketLoss = true,
+}: MultiplexSimulatorProps = {}) {
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const [packetLoss, setPacketLoss] = useState(initialPacketLoss);
   const [lossSeverity, setLossSeverity] = useState<"light" | "medium" | "heavy">(
     "medium"
   );
@@ -46,6 +59,15 @@ export function MultiplexSimulator() {
   useEffect(() => {
     return () => clearTimers();
   }, []);
+
+  useEffect(() => {
+    if (!emphasizeSimulate) return;
+    setMode(initialMode);
+    setPacketLoss(initialPacketLoss);
+    setRunning(false);
+    setStreams(emptyStreams());
+    setPhaseNote("");
+  }, [emphasizeSimulate, initialMode, initialPacketLoss]);
 
   useEffect(() => {
     if (!running) return;
@@ -263,13 +285,26 @@ export function MultiplexSimulator() {
         ))}
         <button
           type="button"
-          className="rounded bg-[var(--accent-soft)] px-2 py-1 text-xs text-[var(--accent)]"
+          id="multiplex-simulate-btn"
+          className={`rounded px-3 py-1.5 text-xs font-medium ${
+            emphasizeSimulate
+              ? "bg-[var(--accent)] text-white shadow-sm ring-2 ring-[var(--accent-soft)]"
+              : "bg-[var(--accent-soft)] text-[var(--accent)]"
+          }`}
           disabled={running}
           onClick={start}
         >
           {running ? "Running…" : "Simulate load"}
         </button>
       </div>
+
+      {emphasizeSimulate && !running && (
+        <p className="mb-3 rounded border border-[var(--accent-border)] bg-[var(--accent-soft)] px-2 py-1.5 text-xs text-[var(--fg)]">
+          Compare showed static wire/frames — <strong>Simulate load</strong> animates
+          how HTTP/1.1, HTTP/2, and HTTP/3 fetch multiple assets (try packet loss on
+          H2 vs H3).
+        </p>
+      )}
 
       {(mode === "h2" || mode === "h3") && (
         <div className="mb-3 flex flex-wrap items-center gap-3 text-xs">

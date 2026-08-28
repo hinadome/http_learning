@@ -1,6 +1,6 @@
 {
   "name": "http_checker",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "engines": {
     "node": ">=20"
@@ -10,7 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "deploy:check": "npm run build"
+    "deploy:check": "bash scripts/deploy-check.sh"
   },
   "dependencies": {
     "@currentspace/http3": "^0.9.0",

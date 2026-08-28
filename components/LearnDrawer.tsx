@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
-import type { ComposedRequest, HttpVersion, TlsInfo } from "@/lib/types";
+import { useEffect, useRef } from "react";
+import type { ComparePair, ComposedRequest, HttpVersion, TlsInfo } from "@/lib/types";
+import { multiplexSimForCompare } from "@/lib/learn/compare-multiplex";
 import { GLOSSARY } from "@/lib/learn/glossary";
 import { AccordionSection } from "./AccordionSection";
 import { CurriculumPanel } from "./CurriculumPanel";
@@ -23,6 +24,7 @@ interface Props {
   onClose: () => void;
   version: HttpVersion;
   showH2H3: boolean;
+  comparePair?: ComparePair | null;
   tlsInfo?: TlsInfo | null;
   onLoadPreset: (request: ComposedRequest, presetId?: string) => void;
 }
@@ -33,9 +35,21 @@ export function LearnDrawer({
   onClose,
   version,
   showH2H3,
+  comparePair,
   tlsInfo,
   onLoadPreset,
 }: Props) {
+  const multiplexRef = useRef<HTMLDivElement>(null);
+  const compareActive = Boolean(comparePair);
+  const simPrefs = comparePair ? multiplexSimForCompare(comparePair) : null;
+
+  useEffect(() => {
+    if (!open || !comparePair || !multiplexRef.current) return;
+    const t = window.setTimeout(() => {
+      multiplexRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [open, comparePair]);
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -79,6 +93,37 @@ export function LearnDrawer({
           </button>
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+          {compareActive && simPrefs && (
+            <div className="rounded border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-2 text-sm">
+              <p className="font-medium text-[var(--fg)]">
+                Compare → multiplex simulation
+              </p>
+              <p className="mt-1 text-xs text-[var(--muted)]">{simPrefs.hint}</p>
+            </div>
+          )}
+
+          <div ref={multiplexRef}>
+            <AccordionSection
+              id="multiplex-simulation"
+              title="HTTP/1.1–3 multiplexing"
+              summary={
+                compareActive
+                  ? "Pinned — click Simulate load below"
+                  : "Animated H1 vs H2 vs H3 load demo + lesson"
+              }
+              defaultOpen
+              pinned={compareActive}
+            >
+              <MultiplexLesson />
+              <MultiplexSimulator
+                key={comparePair ?? "default"}
+                emphasizeSimulate={compareActive}
+                initialMode={simPrefs?.initialMode ?? "h2"}
+                initialPacketLoss={simPrefs?.initialPacketLoss ?? true}
+              />
+            </AccordionSection>
+          </div>
+
           <CurriculumPanel onLoadPreset={onLoadPreset} />
           <DocsPanel version={version} />
           <aside className="rounded border border-[var(--border)] bg-[var(--panel)] p-4">
@@ -104,13 +149,11 @@ export function LearnDrawer({
           {showH2H3 && (
             <AccordionSection
               id="h2h3-lessons"
-              title="HTTP/2–3 lessons"
-              summary="Compression, multiplexing, priorities"
+              title="HTTP/2–3 compression & priority"
+              summary="HPACK vs QPACK, stream priorities"
               defaultOpen
             >
               <CompressionLesson />
-              <MultiplexLesson />
-              <MultiplexSimulator />
               <StreamPrioritySketch />
             </AccordionSection>
           )}

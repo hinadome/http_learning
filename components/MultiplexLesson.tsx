@@ -7,16 +7,25 @@ export function MultiplexLesson() {
     <aside className="rounded border border-[var(--border)] bg-[var(--panel)] p-4">
       <h3 className="mb-2 font-semibold">Multiplexing lesson (H1 vs H2 vs H3)</h3>
       <p className="mb-3 text-sm text-[var(--muted)]">
-        Inspired by interactive labs like{" "}
+        Inspired by the interactive{" "}
         <a
-          href="https://www.network-priority.com/http2-http3-multiplex-lab/"
+          href="https://network-priority.github.io/h2-h3-multiplex-lab/"
           className="text-[var(--accent)] underline"
           target="_blank"
           rel="noreferrer"
         >
           h2-h3-multiplex-lab
+        </a>{" "}
+        (GitHub Pages demo; source on{" "}
+        <a
+          href="https://github.com/network-priority/h2-h3-multiplex-lab"
+          className="text-[var(--accent)] underline"
+          target="_blank"
+          rel="noreferrer"
+        >
+          GitHub
         </a>
-        — why newer HTTP versions exist.
+        ) — why newer HTTP versions exist.
       </p>
       <div className="grid gap-3 text-sm md:grid-cols-3">
         <div className="rounded border border-[var(--border)] p-3">
