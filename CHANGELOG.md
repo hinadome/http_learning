@@ -8,6 +8,9 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- **Cache decision teaching overlay** — Browser vs Shared (CDN) toggle; storage gate (`no-store` / `private`); freshness → Age → serve/revalidate sketch; simplified Age plus collapsible RFC 9111 formula; ~10% heuristic example when Date + Last-Modified present
+
 ---
 
 ## [0.8.2] — 2026-08-27

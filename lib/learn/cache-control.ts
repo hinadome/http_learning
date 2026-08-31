@@ -87,6 +87,222 @@ function ccValue(cc: string | undefined, name: string): string | undefined {
   return undefined;
 }
 
+/** Common teaching example: ~10% of (Date − Last-Modified), floored to seconds. */
+export function heuristicLifetimeSeconds(
+  date?: string,
+  lastModified?: string
+): number | null {
+  if (!date || !lastModified) return null;
+  const d = Date.parse(date);
+  const lm = Date.parse(lastModified);
+  if (!Number.isFinite(d) || !Number.isFinite(lm) || d <= lm) return null;
+  return Math.max(0, Math.floor(((d - lm) / 1000) * 0.1));
+}
+
+export type CacheRole = "browser" | "shared";
+
+export type CacheDecisionOutcome =
+  | "no-store"
+  | "private-skip-shared"
+  | "revalidate"
+  | "serve-fresh"
+  | "revalidate-stale"
+  | "unknown";
+
+export interface CacheDecisionStep {
+  id: string;
+  title: string;
+  detail: string;
+  active: boolean;
+}
+
+export interface CacheDecisionAnalysis {
+  role: CacheRole;
+  outcome: CacheDecisionOutcome;
+  outcomeLabel: string;
+  steps: CacheDecisionStep[];
+  freshnessLifetimeSec: number | null;
+  ageSec: number | null;
+  remainingSec: number | null;
+  ageSimpleNote: string;
+  ageRfcNote: string;
+  disclaimer: string;
+}
+
+/**
+ * Teaching sketch of storage → freshness → age → serve/revalidate.
+ * Does not implement a real cache — analyzes headers only.
+ */
+export function analyzeCacheDecision(opts: {
+  cacheControl?: string;
+  expires?: string;
+  date?: string;
+  age?: string;
+  lastModified?: string;
+  role: CacheRole;
+}): CacheDecisionAnalysis {
+  const sharedCache = opts.role === "shared";
+  const { cacheControl, expires, date, age, lastModified } = opts;
+  const noStore = ccHas(cacheControl, "no-store");
+  const isPrivate = ccHas(cacheControl, "private");
+  const noCache = ccHas(cacheControl, "no-cache");
+  const sMax = ccValue(cacheControl, "s-maxage");
+  const maxAge = ccValue(cacheControl, "max-age");
+
+  let freshnessLifetimeSec: number | null = null;
+  let lifetimeSource = "none";
+
+  if (sharedCache && sMax != null && sMax !== "") {
+    const n = parseInt(sMax, 10);
+    if (Number.isFinite(n)) {
+      freshnessLifetimeSec = n;
+      lifetimeSource = "s-maxage";
+    }
+  } else if (maxAge != null && maxAge !== "") {
+    const n = parseInt(maxAge, 10);
+    if (Number.isFinite(n)) {
+      freshnessLifetimeSec = n;
+      lifetimeSource = "max-age";
+    }
+  } else if (expires && date) {
+    const e = Date.parse(expires);
+    const d = Date.parse(date);
+    if (Number.isFinite(e) && Number.isFinite(d)) {
+      freshnessLifetimeSec = Math.max(0, Math.floor((e - d) / 1000));
+      lifetimeSource = "Expires − Date";
+    }
+  } else if (expires) {
+    lifetimeSource = "Expires (needs Date for Δ)";
+  } else {
+    const h = heuristicLifetimeSeconds(date, lastModified);
+    if (h != null) {
+      freshnessLifetimeSec = h;
+      lifetimeSource = "~10% × (Date − Last-Modified) example";
+    }
+  }
+
+  const ageSec =
+    age != null && age !== "" && Number.isFinite(parseInt(age, 10))
+      ? parseInt(age, 10)
+      : null;
+
+  let remainingSec: number | null = null;
+  if (freshnessLifetimeSec != null && ageSec != null) {
+    remainingSec = freshnessLifetimeSec - ageSec;
+  } else if (freshnessLifetimeSec != null && ageSec == null) {
+    remainingSec = freshnessLifetimeSec;
+  }
+
+  const blockedPrivateShared = sharedCache && isPrivate && !noStore;
+
+  let outcome: CacheDecisionOutcome = "unknown";
+  let outcomeLabel =
+    "Not enough signals to decide — treat as immediately stale or use validators.";
+
+  if (noStore) {
+    outcome = "no-store";
+    outcomeLabel = "Do not use cache — fetch a fresh copy from the origin.";
+  } else if (blockedPrivateShared) {
+    outcome = "private-skip-shared";
+    outcomeLabel =
+      "Shared cache must not store/use this response (private to the browser).";
+  } else if (noCache) {
+    outcome = "revalidate";
+    outcomeLabel =
+      "May have a stored copy, but must revalidate before reuse (even if still within max-age).";
+  } else if (remainingSec != null && remainingSec > 0) {
+    outcome = "serve-fresh";
+    outcomeLabel = `Fresh (~${remainingSec}s left) — a cache may serve without contacting the origin.`;
+  } else if (remainingSec != null && remainingSec <= 0) {
+    outcome = "revalidate-stale";
+    outcomeLabel =
+      "Stale — revalidate with If-None-Match (ETag) and/or If-Modified-Since before serving.";
+  } else if (freshnessLifetimeSec == null && (lastModified || age)) {
+    outcome = "revalidate-stale";
+    outcomeLabel =
+      "No clear freshness lifetime — revalidate or treat as stale; prefer explicit max-age.";
+  }
+
+  const steps: CacheDecisionStep[] = [
+    {
+      id: "storage-no-store",
+      title: "1. Storage — no-store?",
+      detail: noStore
+        ? "Yes → do not store or reuse; go to origin."
+        : "No no-store on this response.",
+      active: noStore,
+    },
+    {
+      id: "storage-private",
+      title: "2. Storage — private on shared cache?",
+      detail: blockedPrivateShared
+        ? "Yes → CDN/proxy must skip this entry (browser may still cache)."
+        : sharedCache
+          ? isPrivate
+            ? "private is set but already blocked by no-store."
+            : "Not private (or viewing as browser) — shared cache may store if otherwise allowed."
+          : "Viewing as browser — private does not block browser storage.",
+      active: blockedPrivateShared,
+    },
+    {
+      id: "freshness",
+      title: "3. Freshness lifetime (T_fresh)",
+      detail:
+        freshnessLifetimeSec != null
+          ? `T_fresh ≈ ${freshnessLifetimeSec}s from ${lifetimeSource}.`
+          : `No numeric lifetime yet (${lifetimeSource}).`,
+      active:
+        !noStore &&
+        !blockedPrivateShared &&
+        freshnessLifetimeSec != null,
+    },
+    {
+      id: "age",
+      title: "4. Current age",
+      detail:
+        ageSec != null
+          ? `Age header = ${ageSec}s → remaining ≈ T_fresh − Age${
+              remainingSec != null ? ` = ${remainingSec}s` : ""
+            }.`
+          : "No Age header — teaching sketch treats remaining ≈ full T_fresh (real caches also add resident time).",
+      active: !noStore && !blockedPrivateShared && ageSec != null,
+    },
+    {
+      id: "reuse",
+      title: "5. Serve vs revalidate",
+      detail: outcomeLabel,
+      active: !noStore && !blockedPrivateShared,
+    },
+  ];
+
+  const ageSimpleNote =
+    ageSec != null && freshnessLifetimeSec != null
+      ? `This app’s sketch: remaining ≈ ${freshnessLifetimeSec} − ${ageSec} = ${
+          remainingSec ?? "?"
+        }s (uses Age header only).`
+      : ageSec != null
+        ? `Age: ${ageSec}s on this response. Pair with max-age / s-maxage to estimate remaining freshness.`
+        : "No Age header on this response. When a cache stores the response, it will add/update Age later.";
+
+  const ageRfcNote =
+    "RFC 9111 sketch: current_age ≈ max(apparent_age, Age_header) + response_delay + resident_time, " +
+    "where apparent_age ≈ max(0, response_time − Date). This teaching proxy only sees one snapshot, so it uses Age (or 0) for the simple remaining estimate.";
+
+  return {
+    role: opts.role,
+    outcome,
+    outcomeLabel,
+    steps,
+    freshnessLifetimeSec,
+    ageSec,
+    remainingSec,
+    ageSimpleNote,
+    ageRfcNote,
+    disclaimer:
+      "Teaching sketch only — this app does not store responses or serve from a local cache. Decisions are inferred from headers on this Send.",
+  };
+}
+
 /**
  * Rank freshness signals present on this response (RFC 9111 teaching sketch).
  * Lower rank = higher precedence for deciding freshness lifetime.
@@ -126,6 +342,18 @@ export function analyzeFreshnessPrecedence(opts: {
     });
   }
 
+  if (ccHas(cacheControl, "private") && sharedCache) {
+    signals.push({
+      id: "private",
+      rank: 0.5,
+      header: "Cache-Control",
+      value: "private",
+      role: "Shared-cache storage ban",
+      wins: !ccHas(cacheControl, "no-store"),
+      note: "Shared caches (CDN/proxy) must not store this response — private to the browser. Freshness lifetime still matters for browser caches.",
+    });
+  }
+
   if (ccHas(cacheControl, "no-cache")) {
     signals.push({
       id: "no-cache",
@@ -133,13 +361,20 @@ export function analyzeFreshnessPrecedence(opts: {
       header: "Cache-Control",
       value: "no-cache",
       role: "Force revalidate",
-      wins: !ccHas(cacheControl, "no-store"),
-      note: "May store, but must revalidate with the origin before every reuse (usually via ETag).",
+      wins:
+        !ccHas(cacheControl, "no-store") &&
+        !(sharedCache && ccHas(cacheControl, "private")),
+      note: "May store, but must revalidate with the origin before every reuse — even if still within max-age (usually via ETag).",
     });
   }
 
   const sMax = ccValue(cacheControl, "s-maxage");
   const maxAge = ccValue(cacheControl, "max-age");
+
+  const blockedSharedPrivate =
+    sharedCache && ccHas(cacheControl, "private");
+  const storageBanned =
+    ccHas(cacheControl, "no-store") || blockedSharedPrivate;
 
   if (sMax != null && sMax !== "") {
     signals.push({
@@ -150,7 +385,7 @@ export function analyzeFreshnessPrecedence(opts: {
       role: "Freshness (shared caches)",
       wins:
         sharedCache &&
-        !ccHas(cacheControl, "no-store") &&
+        !storageBanned &&
         !ccHas(cacheControl, "no-cache"),
       note: `Shared caches use ${sMax}s as freshness lifetime; overrides max-age for CDNs/proxies. Private browsers ignore s-maxage.`,
     });
@@ -161,7 +396,7 @@ export function analyzeFreshnessPrecedence(opts: {
       sharedCache &&
       sMax != null &&
       sMax !== "" &&
-      !ccHas(cacheControl, "no-store");
+      !storageBanned;
     signals.push({
       id: "max-age",
       rank: 3,
@@ -169,7 +404,7 @@ export function analyzeFreshnessPrecedence(opts: {
       value: `max-age=${maxAge}`,
       role: "Freshness (all caches)",
       wins:
-        !ccHas(cacheControl, "no-store") &&
+        !storageBanned &&
         !ccHas(cacheControl, "no-cache") &&
         !sMaxWins,
       note: sMaxWins
@@ -189,7 +424,7 @@ export function analyzeFreshnessPrecedence(opts: {
       value: expires,
       role: "Absolute expiry (legacy)",
       wins:
-        !ccHas(cacheControl, "no-store") &&
+        !storageBanned &&
         !ccHas(cacheControl, "no-cache") &&
         !ccLifetime,
       note: ccLifetime
@@ -238,14 +473,17 @@ export function analyzeFreshnessPrecedence(opts: {
   }
 
   if (lastModified && !maxAge && !sMax && !expires) {
+    const heuristicSecs = heuristicLifetimeSeconds(date, lastModified);
     signals.push({
       id: "heuristic",
       rank: 7,
       header: "Last-Modified",
       value: lastModified,
       role: "Heuristic freshness",
-      wins: !ccHas(cacheControl, "no-store") && !ccHas(cacheControl, "no-cache"),
-      note: "No explicit lifetime — caches may use a heuristic (often a fraction of time since Last-Modified). Prefer sending max-age or Expires.",
+      wins: !storageBanned && !ccHas(cacheControl, "no-cache"),
+      note: heuristicSecs != null
+        ? `No explicit lifetime — example heuristic ≈ 10% of (Date − Last-Modified) ≈ ${heuristicSecs}s. Prefer sending max-age or Expires.`
+        : "No explicit lifetime — caches may use a heuristic (often ~10% of time since Last-Modified). Prefer sending max-age or Expires.",
     });
   }
 
@@ -256,9 +494,12 @@ export function analyzeFreshnessPrecedence(opts: {
     "No explicit freshness lifetime on this response — caches may use heuristics or treat as immediately stale.";
   if (winner?.id === "no-store") {
     summary = "no-store wins: do not cache this response at all.";
+  } else if (winner?.id === "private") {
+    summary =
+      "private + shared cache: CDN/proxy must not store this response (browser caches may still apply max-age).";
   } else if (winner?.id === "no-cache") {
     summary =
-      "no-cache wins for reuse policy: may store, but revalidate before every use.";
+      "no-cache wins for reuse policy: may store, but revalidate before every use — even within max-age.";
   } else if (winner?.id === "s-maxage") {
     summary = `Shared-cache freshness from s-maxage (overrides max-age for CDNs). ${age ? "Apply Age against that lifetime." : ""}`;
   } else if (winner?.id === "max-age") {
@@ -297,33 +538,38 @@ export const FRESHNESS_PRECEDENCE_STEPS: Array<{
     detail: "Do not store — stop. No freshness calculation.",
   },
   {
-    title: "2. no-cache",
+    title: "2. private (shared caches)",
     detail:
-      "May store, but must revalidate before reuse (validators matter more than Age).",
+      "CDN/proxy must not store private responses; browser caches may still use max-age.",
   },
   {
-    title: "3. s-maxage (shared caches)",
+    title: "3. no-cache",
+    detail:
+      "May store, but must revalidate before reuse — even within max-age (validators matter).",
+  },
+  {
+    title: "4. s-maxage (shared caches)",
     detail: "CDN/proxy freshness lifetime; overrides max-age for shared caches only.",
   },
   {
-    title: "4. max-age",
+    title: "5. max-age",
     detail:
       "Freshness lifetime in seconds for browsers (and shared caches if no s-maxage). Overrides Expires.",
   },
   {
-    title: "5. Expires (+ Date)",
+    title: "6. Expires (+ Date)",
     detail:
       "Absolute expiry time. Lifetime ≈ Expires − Date. Used only when no max-age/s-maxage.",
   },
   {
-    title: "6. Age",
+    title: "7. Age",
     detail:
-      "Not a lifetime itself — how old the stored response already is. remaining ≈ lifetime − Age.",
+      "Not a lifetime itself — how old the stored response already is. remaining ≈ lifetime − Age (simplified).",
   },
   {
-    title: "7. Heuristic (Last-Modified)",
+    title: "8. Heuristic (Last-Modified)",
     detail:
-      "If nothing else, caches may guess freshness from Last-Modified. Prefer explicit Cache-Control.",
+      "If nothing else, caches may guess (~10% of Date − Last-Modified is a common example). Prefer explicit Cache-Control.",
   },
 ];
 

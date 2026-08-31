@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import type { SendResponse } from "@/lib/types";
 import {
+  analyzeCacheDecision,
   analyzeFreshnessPrecedence,
   CACHE_LAB_DOCS,
   explainAge,
@@ -11,6 +13,7 @@ import {
   explainExpires,
   FRESHNESS_PRECEDENCE_STEPS,
   VALIDATOR_PRECEDENCE_STEPS,
+  type CacheRole,
 } from "@/lib/learn/cache-control";
 import { DocLinks } from "./DocLinks";
 
@@ -53,6 +56,8 @@ export function CacheControlTeachingPanel({
   status,
   requestHeaderText,
 }: Props) {
+  const [role, setRole] = useState<CacheRole>("shared");
+
   const cacheControl = getHeader(headers, "Cache-Control");
   const etag = getHeader(headers, "ETag");
   const age = getHeader(headers, "Age");
@@ -78,6 +83,7 @@ export function CacheControlTeachingPanel({
 
   if (!relevant) return null;
 
+  const sharedCache = role === "shared";
   const directives = cacheControl ? explainCacheControl(cacheControl) : [];
   const freshness = analyzeFreshnessPrecedence({
     cacheControl,
@@ -85,6 +91,15 @@ export function CacheControlTeachingPanel({
     date,
     age,
     lastModified,
+    sharedCache,
+  });
+  const decision = analyzeCacheDecision({
+    cacheControl,
+    expires,
+    date,
+    age,
+    lastModified,
+    role,
   });
   const outcome = explainConditionalOutcome({
     status,
@@ -102,6 +117,68 @@ export function CacheControlTeachingPanel({
         current?). Lifetime signals compete — see precedence below. Age reduces
         remaining freshness; it does not set it.
       </p>
+
+      <div className="mb-3 rounded border border-[var(--accent)] bg-[var(--panel)] px-2 py-2 text-xs">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h6 className="font-semibold">Cache decision (teaching)</h6>
+          <div
+            className="flex rounded border border-[var(--border)] text-[10px]"
+            role="group"
+            aria-label="Cache role"
+          >
+            {(
+              [
+                ["browser", "Browser"],
+                ["shared", "Shared (CDN)"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={`px-2 py-1 ${
+                  role === id
+                    ? "bg-[var(--accent)] text-white"
+                    : "text-[var(--muted)] hover:text-[var(--fg)]"
+                }`}
+                onClick={() => setRole(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="mb-2 text-[10px] text-[var(--muted)]">
+          {decision.disclaimer}
+        </p>
+        <p className="mb-2 rounded border border-[var(--border)] bg-[var(--code)] px-2 py-1.5 font-medium text-[var(--fg)]">
+          → {decision.outcomeLabel}
+        </p>
+        <ol className="flex flex-col gap-1.5">
+          {decision.steps.map((step) => (
+            <li
+              key={step.id}
+              className={`rounded border px-2 py-1.5 ${
+                step.active
+                  ? "border-[var(--accent)]/60 bg-[var(--accent-soft)]"
+                  : "border-[var(--border)]"
+              }`}
+            >
+              <div className="font-medium text-[var(--fg)]">{step.title}</div>
+              <div className="text-[var(--muted)]">{step.detail}</div>
+            </li>
+          ))}
+        </ol>
+        <div className="mt-2 rounded border border-[var(--border)] px-2 py-1.5 text-[10px] text-[var(--muted)]">
+          <p className="font-medium text-[var(--fg)]">Age (simplified)</p>
+          <p className="mt-0.5">{decision.ageSimpleNote}</p>
+          <details className="mt-1">
+            <summary className="cursor-pointer font-medium text-[var(--fg)]">
+              RFC 9111 age formula (full sketch)
+            </summary>
+            <p className="mt-1">{decision.ageRfcNote}</p>
+          </details>
+        </div>
+      </div>
 
       {cacheControl && (
         <div className="mb-3">
@@ -168,7 +245,10 @@ export function CacheControlTeachingPanel({
       </div>
 
       <div className="mb-3 rounded border border-[var(--border)] bg-[var(--panel)] px-2 py-2 text-xs">
-        <h6 className="mb-1 font-semibold">Precedence on this response</h6>
+        <h6 className="mb-1 font-semibold">
+          Precedence on this response ({role === "shared" ? "shared" : "browser"}{" "}
+          view)
+        </h6>
         <p className="mb-2 text-[var(--muted)]">{freshness.summary}</p>
         {freshness.remainingHint && (
           <p className="mb-2 font-mono text-[10px] text-[var(--fg)]">
